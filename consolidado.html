@@ -140,11 +140,11 @@ const suma = (a,b) => a.map((v,i)=>v+b[i]);
 const exp = {};   // columnas expandidas a meses (por clave)
 const IDX_ALO = D.idxAlojamiento;
 const IDX_TI = D.filas.findIndex(f=>f.tipo==="tI");
-const HOT = D.hoteles.slice().sort((a,b)=> (a.hotelera-b.hotelera) || a.nombre.localeCompare(b.nombre));
-
 // ---- Versión activa: el Ppto = forecast por categoría (mensual) con sus incrementos ----
 function activeVersion(){ try{ const a=localStorage.getItem("shg_version_activa");
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?vs[a]:null; }catch(e){ return null; } }
+function hotelIncluido(id){ const v=activeVersion(); return !v || !Array.isArray(v.hoteles) || v.hoteles.indexOf(id)!==-1; }
+const HOT = D.hoteles.slice().filter(h=> hotelIncluido(h.id)).sort((a,b)=> (a.hotelera-b.hotelera) || a.nombre.localeCompare(b.nombre));
 function incFrac(cat, idHotel){ const v=activeVersion(); if(!v||!cat) return 0;
   const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
 function buildFilas(h){

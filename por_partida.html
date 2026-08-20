@@ -107,7 +107,7 @@
 
   <div class="wrap">
     <h1>Por Partida 2027</h1>
-    <div class="sub">Elige un concepto/margen USALI y un escenario: importes mensuales y total anual por hotel. El Ppto aplica los incrementos por categoría de la versión activa sobre el forecast.</div>
+    <div class="sub">Elige un concepto/margen USALI y un escenario: importes mensuales y total anual por hotel. El Ppto usa el presupuesto de la hoja de trabajo (repartido por partida); los totales por categoría y agregados cuadran con el resto de informes.</div>
     <div class="controls">
       <span class="lbltag">Partida</span>
       <select id="selNodo"></select>
@@ -135,11 +135,11 @@ D.nodos.forEach(n=>{ if(n.p!==n.i){ (HIJOS[n.p]=HIJOS[n.p]||[]).push(n.i); } });
 function subarbol(id){ const out=[id], pila=[id]; while(pila.length){ const x=pila.pop();
   (HIJOS[x]||[]).forEach(h=>{ out.push(h); pila.push(h); }); } return out; }
 
-const HOT = D.hoteles.slice();
-
 // ---- Versión activa: el Ppto = forecast por categoría con sus incrementos ----
 function activeVersion(){ try{ const a=localStorage.getItem("shg_version_activa");
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?vs[a]:null; }catch(e){ return null; } }
+function hotelIncluido(id){ const v=activeVersion(); return !v || !Array.isArray(v.hoteles) || v.hoteles.indexOf(id)!==-1; }
+const HOT = D.hoteles.slice().filter(h=> hotelIncluido(h.id));
 function incFrac(cat, idHotel){ const v=activeVersion(); if(!v||!cat) return 0;
   const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
 // Categoría de cada nodo hoja (arrendamientos gana frente a "otros no operativos").
@@ -150,11 +150,32 @@ const CAT_POR_NODO = {};
     if(c.clave==="otros_no_op" && arrSet.has(n)) return; CAT_POR_NODO[n]=c.clave; }));
 })();
 
+// Forecast mensual por categoría del hotel (mismo signo que pptoCat: ingresos en positivo).
+function fcCatDe(h){
+  if(h._fcCat) return h._fcCat;
+  const out={};
+  Object.keys(h.fc).forEach(id=>{ const cat=CAT_POR_NODO[id]; if(!cat) return;
+    if(!out[cat]) out[cat]=Z(); const s=h.fc[id], sg = ING.has(+id) ? -1 : 1;
+    for(let m=0;m<12;m++) out[cat][m]+= sg*s[m]; });
+  return h._fcCat=out;
+}
 function serie(h, key){                    // 12 meses de la partida para un hotel
   const ids = subarbol(nodo), src = h[key==="ppto"?"fc":key], esPpto = key==="ppto", acc = Z();
-  ids.forEach(id=>{ const s = src[id]; if(!s) return;
-    const f = esPpto ? (1 + incFrac(CAT_POR_NODO[id], h.id)) : 1;
-    for(let m=0;m<12;m++) acc[m]+=s[m]*f; });
+  const v = esPpto ? activeVersion() : null;
+  const pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto por categoría publicado por la hoja de trabajo
+  const fcc = esPpto ? fcCatDe(h) : null;
+  ids.forEach(id=>{ const s = src[id]; if(!s) return; const cat = CAT_POR_NODO[id];
+    for(let m=0;m<12;m++){
+      let f = 1;
+      if(esPpto){
+        // Prioridad: reparto del Ppto publicado (proporcional al forecast) por categoría;
+        // si no hay Ppto publicado, forecast con el incremento de la versión.
+        if(pc && cat && Array.isArray(pc[cat]) && fcc[cat] && fcc[cat][m]) f = pc[cat][m]/fcc[cat][m];
+        else f = 1 + incFrac(cat, h.id);
+      }
+      acc[m] += s[m]*f;
+    }
+  });
   if(ING.has(nodo)) for(let m=0;m<12;m++) acc[m] = -acc[m];   // ingresos en positivo
   return acc;
 }

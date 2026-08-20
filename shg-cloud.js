@@ -149,8 +149,9 @@
     vers.forEach(function (it) {
       var f = it.fields || {}, id = f.Title; if (!id) return;
       _idByTitle[C.listaVersiones][id] = it.id;
+      var hlist = null; try { var hj = JSON.parse(f.HotelesJSON || "null"); if (Array.isArray(hj)) hlist = hj; } catch (e) {}
       out[id] = { anio: +(f[fAnio] || 0), nombre: f.Nombre || "", autor: f.Autor || "",
-        hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON),
+        hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON), hoteles: hlist,
         overrides: {}, medidas: {}, alojamiento: {}, personal: {}, pptoCat: {},
         creada: f.Creada || "", modificada: f.Modificada || "" };
     });
@@ -199,6 +200,7 @@
         Hipotesis: reg.hipotesis || "", IncrementosJSON: JSON.stringify(reg.incrementos || {}),
         Creada: reg.creada || new Date().toISOString(), Modificada: reg.modificada || new Date().toISOString() };
       fields[fAnio] = Number(reg.anio) || 0;
+      if ("HotelesJSON" in cols) fields.HotelesJSON = JSON.stringify(reg.hoteles || []);   // solo si existe la columna
       var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
       if (id) await actualizarItem(C.listaVersiones, id, fields);
       else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }

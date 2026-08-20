@@ -137,11 +137,12 @@ const COLS = [
   {k:"rn",lab:"RN",tipo:"eur"},
 ];
 const METRICAS = COLS.slice(2).map(c=>c.k);
-const HOT = D.hoteles.slice();
-
 // ---- Versión activa: el Ppto = forecast por categoría con sus incrementos ----
 function activeVersion(){ try{ const a=localStorage.getItem("shg_version_activa");
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?vs[a]:null; }catch(e){ return null; } }
+// Hoteles incluidos en la versión (si la versión no lo define, todos).
+function hotelIncluido(id){ const v=activeVersion(); return !v || !Array.isArray(v.hoteles) || v.hoteles.indexOf(id)!==-1; }
+const HOT = D.hoteles.slice().filter(h=> hotelIncluido(h.id));
 function incFrac(cat, idHotel){ const v=activeVersion(); if(!v) return 0;
   const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
 function metricasDeCat(cat){
