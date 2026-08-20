@@ -140,7 +140,7 @@
       _idByTitle[C.listaVersiones][id] = it.id;
       out[id] = { anio: +(f[fAnio] || 0), nombre: f.Nombre || "", autor: f.Autor || "",
         hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON),
-        overrides: {}, medidas: {}, alojamiento: {}, personal: {},
+        overrides: {}, medidas: {}, alojamiento: {}, personal: {}, pptoCat: {},
         creada: f.Creada || "", modificada: f.Modificada || "" };
     });
     hots.forEach(function (it) {
@@ -152,6 +152,7 @@
       if (f.MedidasJSON)      out[vid].medidas[hid]      = _parse(f.MedidasJSON);
       if (f.AlojamientoJSON)  out[vid].alojamiento[hid]  = _parse(f.AlojamientoJSON);
       if (f.PersonalJSON)     out[vid].personal[hid]     = _parse(f.PersonalJSON);
+      if (f.PptoCatJSON)      out[vid].pptoCat[hid]      = _parse(f.PptoCatJSON);
     });
     localStorage.setItem(LS_VS, JSON.stringify(out));
     _conectado = true;
@@ -185,7 +186,8 @@
         OverridesJSON:   JSON.stringify((reg.overrides   && reg.overrides[hid])   || {}),
         MedidasJSON:     JSON.stringify((reg.medidas     && reg.medidas[hid])     || {}),
         AlojamientoJSON: JSON.stringify((reg.alojamiento && reg.alojamiento[hid]) || {}),
-        PersonalJSON:    JSON.stringify((reg.personal    && reg.personal[hid])    || {}) };
+        PersonalJSON:    JSON.stringify((reg.personal    && reg.personal[hid])    || {}),
+        PptoCatJSON:     JSON.stringify((reg.pptoCat     && reg.pptoCat[hid])     || {}) };
       var id = _idByTitle[C.listaHoteles] && _idByTitle[C.listaHoteles][title];
       if (id) await actualizarItem(C.listaHoteles, id, fields);
       else { var c = await crearItem(C.listaHoteles, fields); _idByTitle[C.listaHoteles][title] = c.id; }

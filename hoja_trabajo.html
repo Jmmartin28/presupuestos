@@ -280,6 +280,21 @@ function recompute() {
   window._wR=waterfall(g=>escGrupo(g,"prevMes"));
   window._wF=waterfall(g=>escGrupo(g,"fcMes"));
   writeValues();
+  publicarPpto();
+}
+// Publica el Ppto por categoría (mensual) de este hotel para que lo lean los informes.
+function publicarPpto(){
+  const act = localStorage.getItem("shg_version_activa"); if(!act) return;
+  try {
+    const vs = JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[act]) return;
+    const pc = {}; D.grupos.forEach(g=> pc[g.catClave] = (g._m||Z()).map(v=> Math.round(v)));
+    vs[act].pptoCat = vs[act].pptoCat || {};
+    vs[act].pptoCat[D.idHotel] = pc;
+    vs[act].modificada = new Date().toISOString();
+    localStorage.setItem("shg_versiones", JSON.stringify(vs));
+    clearTimeout(publicarPpto._t);
+    publicarPpto._t = setTimeout(()=>{ if(window.SHG) SHG.pushHotel(act, D.idHotel); }, 700);
+  } catch(e){}
 }
 function escGrupo(g,campo){ const s=Z(); g.detalle.forEach(d=>d[campo].forEach((v,i)=>s[i]+=v)); return s; }
 

@@ -141,7 +141,8 @@ function activeVersion(){ try{ const a=localStorage.getItem("shg_version_activa"
 function incFrac(cat, idHotel){ const v=activeVersion(); if(!v||!cat) return 0;
   const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
 function buildFilas(h){
-  const cv={}; D.catClaves.forEach(k=> cv[k]=(h.catMes[k]||Z()).map(v=> v*(1+incFrac(k,h.id))));
+  const v=activeVersion(), pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto mensual detallado de la hoja de trabajo
+  const cv={}; D.catClaves.forEach(k=> cv[k]= (pc && Array.isArray(pc[k])) ? pc[k].slice() : (h.catMes[k]||Z()).map(x=> x*(1+incFrac(k,h.id))));
   const sumc = list => list.reduce((acc,k)=> acc.map((v,i)=>v+cv[k][i]), Z());
   const tI=sumc(D.catIngresos), tG=sumc(D.catOperativos), gop=tI.map((v,i)=>v-tG[i]);
   const mf=cv.management_fees, alq=cv.arrendamientos, onp=cv.otros_no_op, soc=cv.societarios;

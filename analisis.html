@@ -149,7 +149,11 @@ function metricasDeCat(cat){
   const ebitda=gop-mf-alq-onp;
   return {ventas, personal:cat.personal||0, gop, mf, alq, energeticos:cat.energeticos||0, ebitda, ebitdaSinMf:ebitda+mf, rn:ebitda-soc};
 }
-function catPpto(h){ const out={}; D.catClaves.forEach(k=> out[k]=(h.catFc[k]||0)*(1+incFrac(k,h.id))); return out; }
+function catPpto(h){
+  const v=activeVersion(), pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto detallado de la hoja de trabajo
+  if(pc){ const out={}; D.catClaves.forEach(k=> out[k]= Array.isArray(pc[k]) ? pc[k].reduce((a,x)=>a+x,0) : 0); return out; }
+  const out={}; D.catClaves.forEach(k=> out[k]=(h.catFc[k]||0)*(1+incFrac(k,h.id))); return out;
+}
 HOT.forEach(h=> h.m = { ppto:metricasDeCat(catPpto(h)), fc:metricasDeCat(h.catFc), prev:metricasDeCat(h.catPrev) });
 
 // Suma de un margen (concepto) sobre las entidades que cumplen la condición, por escenario.
