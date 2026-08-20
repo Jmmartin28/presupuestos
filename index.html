@@ -79,13 +79,18 @@
     box-shadow:var(--shadow); padding:16px; width:min(680px,92vw); }
   .modal textarea { width:100%; min-height:220px; font-family:ui-monospace,Consolas,monospace; font-size:11.5px; }
   footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
+  .ab-nube { position:fixed; top:10px; right:14px; z-index:60; font-size:11.5px; border-radius:999px;
+    padding:5px 10px; border:1px solid var(--line); color:var(--muted); background:var(--panel); }
+  .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
+  .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
 </style>
 </head>
 <body>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-  <script src="config.js"></script>
-  <script src="shg-cloud.js"></script>
+  <script src="config.js?v=3"></script>
+  <script src="shg-cloud.js?v=3"></script>
   <script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
+  <span class="ab-nube" id="abNube">Nube: comprobando…</span>
   <div class="wrap">
     <h1>Presupuestos SHG · Inicio</h1>
     <div class="sub">Elige si quieres crear una versión nueva o abrir una ya creada. Con una versión activa, desde aquí navegas a la hoja de trabajo y a los informes.</div>

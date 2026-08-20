@@ -122,6 +122,12 @@
 
   function _parse(s) { try { return s ? JSON.parse(s) : {}; } catch (e) { return {}; } }
 
+  // Pinta el estado de la nube en el indicador visible (#abNube), si existe.
+  function _estado(txt, tipo) {
+    var e = document.getElementById("abNube");
+    if (e) { e.textContent = "Nube: " + txt; e.className = "ab-nube " + (tipo || ""); }
+  }
+
   // Descarga las dos listas y reconstruye el objeto shg_versiones en localStorage.
   async function cargarTodo() {
     var colsV = await getCols(C.listaVersiones), fAnio = interno(colsV, "Año");
@@ -154,7 +160,7 @@
 
   // Guarda (upsert) la fila de metadatos de una versión desde localStorage.
   async function pushVersion(versionId) {
-    if (!_conectado) { console.warn("pushVersion: sin conexión, no se guarda"); return; }
+    if (!_conectado) { console.warn("pushVersion: sin conexión"); _estado("sin conexión: NO se guarda", "err"); return; }
     try {
       var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
       var cols = await getCols(C.listaVersiones), fAnio = interno(cols, "Año");
@@ -165,12 +171,13 @@
       var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
       if (id) await actualizarItem(C.listaVersiones, id, fields);
       else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
-    } catch (e) { console.error("Error guardando la versión en SharePoint:", e); }
+      _estado("versión guardada ✓", "ok");
+    } catch (e) { console.error("Error guardando la versión en SharePoint:", e); _estado("error al guardar: " + e.message, "err"); }
   }
 
   // Guarda (upsert) la fila de un hotel de una versión desde localStorage.
   async function pushHotel(versionId, hotelId) {
-    if (!_conectado) { console.warn("pushHotel: sin conexión, no se guarda"); return; }
+    if (!_conectado) { console.warn("pushHotel: sin conexión"); _estado("sin conexión: NO se guarda", "err"); return; }
     try {
       var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
       var hid = String(hotelId), title = versionId + "_" + hid;
@@ -182,14 +189,18 @@
       var id = _idByTitle[C.listaHoteles] && _idByTitle[C.listaHoteles][title];
       if (id) await actualizarItem(C.listaHoteles, id, fields);
       else { var c = await crearItem(C.listaHoteles, fields); _idByTitle[C.listaHoteles][title] = c.id; }
-    } catch (e) { console.error("Error guardando el hotel en SharePoint:", e); }
+      _estado("hotel guardado ✓", "ok");
+    } catch (e) { console.error("Error guardando el hotel en SharePoint:", e); _estado("error al guardar: " + e.message, "err"); }
   }
 
   // Sincroniza una vez por sesión al abrir cualquier pantalla en GitHub Pages: hace
   // login, descarga las versiones a localStorage y recarga (para que la página se
   // pinte con los datos frescos). En local no hace nada (modo localStorage).
   async function autoSync() {
-    if (location.hostname.indexOf("github.io") === -1) return;   // modo local
+    if (location.hostname.indexOf("github.io") === -1) {         // modo local
+      setTimeout(function () { _estado("modo local (sin SharePoint)", ""); }, 0);
+      return;
+    }
     var primera = !sessionStorage.getItem("shg_synced");
     if (primera) document.documentElement.style.visibility = "hidden";  // evita el parpadeo
     try {
@@ -199,9 +210,11 @@
       // índice de ítems, para que los guardados funcionen también tras la recarga.
       await cargarTodo();
       if (primera) { sessionStorage.setItem("shg_synced", "1"); location.reload(); return; }
+      _estado("conectado ✓", "ok");
     } catch (e) {
-      console.warn("Nube no disponible, modo local:", e);
+      console.error("Nube no disponible:", e);
       sessionStorage.setItem("shg_synced", "1");
+      _estado("error: " + e.message, "err");
     }
     document.documentElement.style.visibility = "";
   }

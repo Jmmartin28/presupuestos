@@ -68,7 +68,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js"></script><script src="shg-cloud.js"></script><script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=3"></script><script src="shg-cloud.js?v=3"></script><script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -86,8 +86,12 @@
   .appbar .ab-ver { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px;
     padding:5px 12px; white-space:nowrap; }
   .appbar .ab-ver.on { color:var(--res); border-color:var(--res); background:var(--res-bg); font-weight:700; }
+  .ab-nube { font-size:11.5px; border:1px solid var(--line); border-radius:999px; padding:5px 10px;
+    white-space:nowrap; color:var(--muted); }
+  .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
+  .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
 </style>
-<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="consolidado.html" class="on" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
+<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="consolidado.html" class="on" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
 <script>
 (function(){
   try {
