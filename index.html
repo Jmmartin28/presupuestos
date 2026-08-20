@@ -276,7 +276,6 @@ $("guardar").addEventListener("click", ()=>{
   vs[id]=reg; guardarVersiones(vs);
   if(window.SHG) SHG.pushVersion(id);   // guardar metadatos en SharePoint
   activar(id); $("guardadoAviso").textContent="Guardada ✓";
-  $("json").value=JSON.stringify(reg, null, 2); $("modal").classList.add("open");
 });
 
 // Guardar como: bifurca la versión activa. La original queda como está hasta este

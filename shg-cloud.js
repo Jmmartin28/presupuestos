@@ -154,31 +154,35 @@
 
   // Guarda (upsert) la fila de metadatos de una versión desde localStorage.
   async function pushVersion(versionId) {
-    if (!_conectado) return;
-    var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
-    var cols = await getCols(C.listaVersiones), fAnio = interno(cols, "Año");
-    var fields = { Title: versionId, Nombre: reg.nombre || "", Autor: reg.autor || "",
-      Hipotesis: reg.hipotesis || "", IncrementosJSON: JSON.stringify(reg.incrementos || {}),
-      Creada: reg.creada || new Date().toISOString(), Modificada: reg.modificada || new Date().toISOString() };
-    fields[fAnio] = Number(reg.anio) || 0;
-    var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
-    if (id) await actualizarItem(C.listaVersiones, id, fields);
-    else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
+    if (!_conectado) { console.warn("pushVersion: sin conexión, no se guarda"); return; }
+    try {
+      var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
+      var cols = await getCols(C.listaVersiones), fAnio = interno(cols, "Año");
+      var fields = { Title: versionId, Nombre: reg.nombre || "", Autor: reg.autor || "",
+        Hipotesis: reg.hipotesis || "", IncrementosJSON: JSON.stringify(reg.incrementos || {}),
+        Creada: reg.creada || new Date().toISOString(), Modificada: reg.modificada || new Date().toISOString() };
+      fields[fAnio] = Number(reg.anio) || 0;
+      var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
+      if (id) await actualizarItem(C.listaVersiones, id, fields);
+      else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
+    } catch (e) { console.error("Error guardando la versión en SharePoint:", e); }
   }
 
   // Guarda (upsert) la fila de un hotel de una versión desde localStorage.
   async function pushHotel(versionId, hotelId) {
-    if (!_conectado) return;
-    var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
-    var hid = String(hotelId), title = versionId + "_" + hid;
-    var fields = { Title: title, VersionId: versionId, HotelId: Number(hotelId) || 0,
-      OverridesJSON:   JSON.stringify((reg.overrides   && reg.overrides[hid])   || {}),
-      MedidasJSON:     JSON.stringify((reg.medidas     && reg.medidas[hid])     || {}),
-      AlojamientoJSON: JSON.stringify((reg.alojamiento && reg.alojamiento[hid]) || {}),
-      PersonalJSON:    JSON.stringify((reg.personal    && reg.personal[hid])    || {}) };
-    var id = _idByTitle[C.listaHoteles] && _idByTitle[C.listaHoteles][title];
-    if (id) await actualizarItem(C.listaHoteles, id, fields);
-    else { var c = await crearItem(C.listaHoteles, fields); _idByTitle[C.listaHoteles][title] = c.id; }
+    if (!_conectado) { console.warn("pushHotel: sin conexión, no se guarda"); return; }
+    try {
+      var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
+      var hid = String(hotelId), title = versionId + "_" + hid;
+      var fields = { Title: title, VersionId: versionId, HotelId: Number(hotelId) || 0,
+        OverridesJSON:   JSON.stringify((reg.overrides   && reg.overrides[hid])   || {}),
+        MedidasJSON:     JSON.stringify((reg.medidas     && reg.medidas[hid])     || {}),
+        AlojamientoJSON: JSON.stringify((reg.alojamiento && reg.alojamiento[hid]) || {}),
+        PersonalJSON:    JSON.stringify((reg.personal    && reg.personal[hid])    || {}) };
+      var id = _idByTitle[C.listaHoteles] && _idByTitle[C.listaHoteles][title];
+      if (id) await actualizarItem(C.listaHoteles, id, fields);
+      else { var c = await crearItem(C.listaHoteles, fields); _idByTitle[C.listaHoteles][title] = c.id; }
+    } catch (e) { console.error("Error guardando el hotel en SharePoint:", e); }
   }
 
   // Sincroniza una vez por sesión al abrir cualquier pantalla en GitHub Pages: hace
@@ -186,19 +190,20 @@
   // pinte con los datos frescos). En local no hace nada (modo localStorage).
   async function autoSync() {
     if (location.hostname.indexOf("github.io") === -1) return;   // modo local
-    if (sessionStorage.getItem("shg_synced")) return;            // ya sincronizado esta sesión
-    document.documentElement.style.visibility = "hidden";        // evita el parpadeo
+    var primera = !sessionStorage.getItem("shg_synced");
+    if (primera) document.documentElement.style.visibility = "hidden";  // evita el parpadeo
     try {
       await init();
       if (!cuenta()) { login(); return; }                        // redirige a login corporativo
+      // SIEMPRE se descarga: así queda establecida la conexión (_conectado) y el
+      // índice de ítems, para que los guardados funcionen también tras la recarga.
       await cargarTodo();
-      sessionStorage.setItem("shg_synced", "1");
-      location.reload();
+      if (primera) { sessionStorage.setItem("shg_synced", "1"); location.reload(); return; }
     } catch (e) {
       console.warn("Nube no disponible, modo local:", e);
       sessionStorage.setItem("shg_synced", "1");
-      document.documentElement.style.visibility = "";
     }
+    document.documentElement.style.visibility = "";
   }
   function conectado() { return _conectado; }
 
