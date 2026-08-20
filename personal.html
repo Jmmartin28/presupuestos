@@ -154,10 +154,11 @@ const manual = { abs:Z().map(()=>null), vac:Z().map(()=>null), eve:Z().map(()=>n
 // ---- Autoguardado sobre la versión activa ----
 function _activeVer(){ try{ const a=localStorage.getItem("shg_version_activa");
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?a:null; }catch(e){ return null; } }
-function estadoPers(){ const cur=window._cur||{base:Z(),unif:Z()};
+function estadoPers(){ const cur=window._cur||{}; const arr=a=> Array.isArray(a)?a.slice():Z();
   return { puestos:P.puestos, pAbs:$("pAbs").value, pVac:$("pVac").value,
     pEve:$("pEve").value, manual:manual, unif:unifManual,
-    costeMes: (cur.base||Z()).map((b,i)=> b + ((cur.unif&&cur.unif[i])||0)) }; }   // coste publicado para la hoja de trabajo
+    // Componentes publicados para la hoja de trabajo (Sueldos, Seg. Social, Uniformes).
+    sueldosMes: arr(cur.sueldos), segsocMes: arr(cur.segsoc), uniformesMes: arr(cur.uniformes) }; }
 let _saveT=null;
 function guardarPers(){ const a=_activeVer(), h=$("savedHint");
   if(!a){ if(h){ h.textContent="Sin versión activa"; h.style.opacity=1; } return; }

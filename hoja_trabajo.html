@@ -196,36 +196,47 @@ function incPct(cat){                       // % de incremento de una categoría
   const f=(cat in o) ? o[cat] : (v.incrementos ? v.incrementos[cat] : 0);
   return (f||0)*100;
 }
-// Total mensual publicado por otra página de la versión (Alojamiento / Personal).
-function totalPagina(sec){
+// Ingresos de Alojamiento publicados por su página (ventas = ocupación×ADR).
+function alojPaginaMes(){
   const v=activeVersion(); if(!v) return null;
-  const d = sec==="aloj" ? (v.alojamiento && v.alojamiento[D.idHotel])
-                         : (v.personal    && v.personal[D.idHotel]);
-  if(!d) return null;
-  const s = sec==="aloj" ? d.ventasMes : d.costeMes;
-  return (Array.isArray(s) && s.length===12) ? s : null;
+  const d = v.alojamiento && v.alojamiento[D.idHotel]; if(!d) return null;
+  return (Array.isArray(d.ventasMes) && d.ventasMes.length===12) ? d.ventasMes : null;
+}
+// Componentes de Personal publicados por su página (Sueldos, Seg. Social, Uniformes).
+function persPaginaMes(){
+  const v=activeVersion(); if(!v) return null;
+  const p = v.personal && v.personal[D.idHotel]; if(!p) return null;
+  const ok = a => Array.isArray(a) && a.length===12;
+  return { sueldos: ok(p.sueldosMes)?p.sueldosMes:null, segsoc: ok(p.segsocMes)?p.segsocMes:null,
+           uniformes: ok(p.uniformesMes)?p.uniformesMes:null };
+}
+// Fuente-página de una partida: "aloj" / "sueldos" / "segsoc" / "uniformes" / null.
+function fuentePagina(g, d){
+  if (g.esAlojamiento) return "aloj";
+  if (g.catClave==="personal"){ const n=norm(d.nombre);
+    if (n.indexOf("sueldos")!==-1) return "sueldos";
+    if (n.indexOf("seguros")!==-1 && n.indexOf("social")!==-1) return "segsoc";
+    if (n.indexOf("uniform")!==-1) return "uniformes"; }
+  return null;
 }
 function ctx() {
   const incPorCat={}; D.grupos.forEach(g=> incPorCat[g.catClave]=incPct(g.catClave));
   return { incPorCat, ocuMes: D.drivers.ocuMes, alojMes: D.drivers.alojMes,
-    alojPag: totalPagina("aloj"), persPag: totalPagina("pers"),
+    alojPag: alojPaginaMes(), persPag: persPaginaMes(),
     ventasTot: Z(), ventasAloj: D.drivers.alojMes, ventasFb: Z(), refs: {} };
 }
 function drvMes(d,c){ return d.driver==="aloj"? c.ventasAloj : d.driver==="fb"? c.ventasFb : c.ventasTot; }
 
 function calcDetalle(d, g, c) {
   let m;
-  const pagina = g.esAlojamiento ? "aloj" : (g.catClave==="personal" ? "pers" : null);
-  if (pagina) {
-    // Partida gobernada por su página (Alojamiento / Personal): usa su total mensual
-    // publicado (repartido por partida); si aún no hay datos, forecast con incremento.
-    const total = pagina==="aloj" ? c.alojPag : c.persPag;
+  const fuente = fuentePagina(g, d);
+  if (fuente === "aloj") {
     const inc = c.incPorCat[g.catClave] || 0;
-    m = total ? total.map(v => v * d.share) : d.fcMes.map(v => v * (1 + inc/100));
-  } else if (g.ingreso) {
-    // Resto de ingresos: sin métodos. Base = forecast con incremento de la categoría.
-    const inc = c.incPorCat[g.catClave] || 0;
-    m = d.fcMes.map(v => v * (1 + inc/100));
+    m = c.alojPag ? c.alojPag.map(v => v * d.share) : d.fcMes.map(v => v * (1 + inc/100));
+  } else if (fuente) {
+    // Sueldos / Seg. Social / Uniformes: importe exacto de la página de Personal.
+    const s = c.persPag && c.persPag[fuente]; const inc = c.incPorCat.personal || 0;
+    m = s ? s.slice() : d.fcMes.map(v => v * (1 + inc/100));
   } else {
     const usa = d.fijo!=null || d.ratio!=null || d.pct!=null || (d.formula && d.formula.trim());
     if (!usa) {
@@ -352,7 +363,7 @@ D.grupos.forEach((g,gi)=>{
   g.detalle.forEach((d,di)=>{
     html+=`<tr class="detalle" data-g="${gi}"><td class="lbl">${d.nombre}</td>`
       + escCols("R-"+gi+"-"+di,"R") + escCols("F-"+gi+"-"+di,"F") + pptoCols("P-"+gi+"-"+di,true)
-      + metodo(gi,di,(g.ingreso||g.catClave==="personal")?null:d) + `</tr>`;
+      + metodo(gi,di, fuentePagina(g,d) ? null : d) + `</tr>`;
   });
   const s=D.grupos[gi+1];
   if(g.seccion==="ing"&&(!s||s.seccion!=="ing")) html+=margen("tI","w-ing","TOTAL INGRESOS");
