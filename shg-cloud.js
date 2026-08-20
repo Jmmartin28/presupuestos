@@ -190,7 +190,8 @@
 
   // Guarda (upsert) la fila de metadatos de una versión desde localStorage.
   async function pushVersion(versionId) {
-    if (!_conectado) { _pending["v:" + versionId] = ["version", versionId]; return; }   // se guarda al conectar
+    if (!_conectado) { _pending["v:" + versionId] = ["version", versionId]; _estado("guardando (esperando conexión)…", ""); return; }
+    _estado("guardando…", "");
     try {
       var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
       var cols = await getCols(C.listaVersiones), fAnio = interno(cols, "Año");
@@ -201,13 +202,14 @@
       var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
       if (id) await actualizarItem(C.listaVersiones, id, fields);
       else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
-      _estado("versión guardada ✓", "ok");
-    } catch (e) { console.error("Error guardando la versión en SharePoint:", e); _estado("error al guardar: " + e.message, "err"); }
+      _estado("guardado ✓ " + new Date().toLocaleTimeString(), "ok");
+    } catch (e) { console.error("Error guardando la versión en SharePoint:", e); _estado("⚠ NO guardado: " + e.message, "err"); }
   }
 
   // Guarda (upsert) la fila de un hotel de una versión desde localStorage.
   async function pushHotel(versionId, hotelId) {
-    if (!_conectado) { _pending["h:" + versionId + ":" + hotelId] = ["hotel", versionId, hotelId]; return; }   // se guarda al conectar
+    if (!_conectado) { _pending["h:" + versionId + ":" + hotelId] = ["hotel", versionId, hotelId]; _estado("guardando (esperando conexión)…", ""); return; }
+    _estado("guardando…", "");
     try {
       var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
       var hid = String(hotelId), title = versionId + "_" + hid;
@@ -220,8 +222,8 @@
       var id = _idByTitle[C.listaHoteles] && _idByTitle[C.listaHoteles][title];
       if (id) await actualizarItem(C.listaHoteles, id, fields);
       else { var c = await crearItem(C.listaHoteles, fields); _idByTitle[C.listaHoteles][title] = c.id; }
-      _estado("hotel guardado ✓", "ok");
-    } catch (e) { console.error("Error guardando el hotel en SharePoint:", e); _estado("error al guardar: " + e.message, "err"); }
+      _estado("guardado ✓ " + new Date().toLocaleTimeString(), "ok");
+    } catch (e) { console.error("Error guardando el hotel en SharePoint:", e); _estado("⚠ NO guardado: " + e.message, "err"); }
   }
 
   // Sincroniza una vez por sesión al abrir cualquier pantalla en GitHub Pages: hace

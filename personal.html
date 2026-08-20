@@ -168,7 +168,7 @@ function guardarPers(){ const a=_activeVer(), h=$("savedHint");
     vs[a].modificada=new Date().toISOString();
     localStorage.setItem("shg_versiones", JSON.stringify(vs));
     if(window.SHG) SHG.pushHotel(a, D.idHotel);   // guardar en SharePoint
-    if(h){ h.textContent="Guardado ✓"; h.style.opacity=1; clearTimeout(guardarPers._t); guardarPers._t=setTimeout(()=>h.style.opacity=0,1500); }
+    if(h){ h.textContent="✎ cambios registrados"; h.style.opacity=1; clearTimeout(guardarPers._t); guardarPers._t=setTimeout(()=>h.style.opacity=0,1500); }
   }catch(e){} }, 400); }
 function cargarPers(){ const a=_activeVer(); if(!a) return; try{
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");

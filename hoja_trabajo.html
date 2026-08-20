@@ -463,7 +463,7 @@ function recogerMedidas(){
   }));
   return med;
 }
-function marcarGuardado(txt){ const e=$("savedHint"); if(!e) return; e.style.opacity=1; e.textContent=txt||"Guardado ✓";
+function marcarGuardado(txt){ const e=$("savedHint"); if(!e) return; e.style.opacity=1; e.textContent=txt||"✎ cambios registrados";
   clearTimeout(marcarGuardado._t); marcarGuardado._t=setTimeout(()=>{ e.style.opacity=0; }, 1600); }
 let _saveT=null;
 function guardarMedidas(){
