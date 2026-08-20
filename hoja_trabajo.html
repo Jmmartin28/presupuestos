@@ -196,20 +196,36 @@ function incPct(cat){                       // % de incremento de una categoría
   const f=(cat in o) ? o[cat] : (v.incrementos ? v.incrementos[cat] : 0);
   return (f||0)*100;
 }
+// Total mensual publicado por otra página de la versión (Alojamiento / Personal).
+function totalPagina(sec){
+  const v=activeVersion(); if(!v) return null;
+  const d = sec==="aloj" ? (v.alojamiento && v.alojamiento[D.idHotel])
+                         : (v.personal    && v.personal[D.idHotel]);
+  if(!d) return null;
+  const s = sec==="aloj" ? d.ventasMes : d.costeMes;
+  return (Array.isArray(s) && s.length===12) ? s : null;
+}
 function ctx() {
   const incPorCat={}; D.grupos.forEach(g=> incPorCat[g.catClave]=incPct(g.catClave));
   return { incPorCat, ocuMes: D.drivers.ocuMes, alojMes: D.drivers.alojMes,
+    alojPag: totalPagina("aloj"), persPag: totalPagina("pers"),
     ventasTot: Z(), ventasAloj: D.drivers.alojMes, ventasFb: Z(), refs: {} };
 }
 function drvMes(d,c){ return d.driver==="aloj"? c.ventasAloj : d.driver==="fb"? c.ventasFb : c.ventasTot; }
 
 function calcDetalle(d, g, c) {
   let m;
-  if (g.ingreso) {
-    // Ingresos: sin métodos. Base = forecast con incremento de la categoría; en
-    // Alojamiento tiene prioridad el valor de su hoja (d.aloj) si existe.
+  const pagina = g.esAlojamiento ? "aloj" : (g.catClave==="personal" ? "pers" : null);
+  if (pagina) {
+    // Partida gobernada por su página (Alojamiento / Personal): usa su total mensual
+    // publicado (repartido por partida); si aún no hay datos, forecast con incremento.
+    const total = pagina==="aloj" ? c.alojPag : c.persPag;
     const inc = c.incPorCat[g.catClave] || 0;
-    m = (g.esAlojamiento && d.aloj) ? d.aloj.slice() : d.fcMes.map(v => v * (1 + inc/100));
+    m = total ? total.map(v => v * d.share) : d.fcMes.map(v => v * (1 + inc/100));
+  } else if (g.ingreso) {
+    // Resto de ingresos: sin métodos. Base = forecast con incremento de la categoría.
+    const inc = c.incPorCat[g.catClave] || 0;
+    m = d.fcMes.map(v => v * (1 + inc/100));
   } else {
     const usa = d.fijo!=null || d.ratio!=null || d.pct!=null || (d.formula && d.formula.trim());
     if (!usa) {
@@ -336,7 +352,7 @@ D.grupos.forEach((g,gi)=>{
   g.detalle.forEach((d,di)=>{
     html+=`<tr class="detalle" data-g="${gi}"><td class="lbl">${d.nombre}</td>`
       + escCols("R-"+gi+"-"+di,"R") + escCols("F-"+gi+"-"+di,"F") + pptoCols("P-"+gi+"-"+di,true)
-      + metodo(gi,di,g.ingreso?null:d) + `</tr>`;
+      + metodo(gi,di,(g.ingreso||g.catClave==="personal")?null:d) + `</tr>`;
   });
   const s=D.grupos[gi+1];
   if(g.seccion==="ing"&&(!s||s.seccion!=="ing")) html+=margen("tI","w-ing","TOTAL INGRESOS");

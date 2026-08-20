@@ -151,7 +151,8 @@ function guardarAloj(){ const a=_activeVer(), h=$("savedHint");
   clearTimeout(_saveT); _saveT=setTimeout(()=>{ try{
     const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[a]) return;
     vs[a].alojamiento=vs[a].alojamiento||{};
-    vs[a].alojamiento[D.idHotel]={ dias:S.dias, ocu:S.ocu, adr:S.adr, incIng:parseFloat($("incIng").value)||0 };
+    vs[a].alojamiento[D.idHotel]={ dias:S.dias, ocu:S.ocu, adr:S.adr, incIng:parseFloat($("incIng").value)||0,
+      ventasMes: S.ocu.map((o,i)=> o*S.adr[i]) };   // ingresos publicados para la hoja de trabajo
     vs[a].modificada=new Date().toISOString();
     localStorage.setItem("shg_versiones", JSON.stringify(vs));
     if(window.SHG) SHG.pushHotel(a, D.idHotel);   // guardar en SharePoint
