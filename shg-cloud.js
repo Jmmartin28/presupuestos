@@ -119,8 +119,19 @@
   var LS_VS = "shg_versiones", LS_ACT = "shg_version_activa";
   var _conectado = false;
   var _idByTitle = {};   // { nombreLista: { Title: itemId } } para saber POST vs PATCH
+  var _pending = {};     // guardados en espera hasta tener conexión (clave -> [tipo, ...args])
 
   function _parse(s) { try { return s ? JSON.parse(s) : {}; } catch (e) { return {}; } }
+
+  // Al establecer la conexión, ejecuta los guardados que quedaron pendientes.
+  function _flush() {
+    _conectado = true;
+    var p = _pending; _pending = {};
+    Object.keys(p).forEach(function (k) {
+      var x = p[k];
+      if (x[0] === "version") pushVersion(x[1]); else pushHotel(x[1], x[2]);
+    });
+  }
 
   // Pinta el estado de la nube en el indicador visible (#abNube), si existe.
   function _estado(txt, tipo) {
@@ -155,13 +166,31 @@
       if (f.PptoCatJSON)      out[vid].pptoCat[hid]      = _parse(f.PptoCatJSON);
     });
     localStorage.setItem(LS_VS, JSON.stringify(out));
-    _conectado = true;
+    _flush();
     return out;
+  }
+
+  // Lee solo los Title→id de las dos listas (para poder guardar), SIN tocar el
+  // localStorage. Se usa al navegar entre pantallas para no pisar lo calculado.
+  async function cargarIndice() {
+    var sid = await getSiteId(), tok = await getToken();
+    for (var i = 0; i < 2; i++) {
+      var lista = i === 0 ? C.listaVersiones : C.listaHoteles;
+      var lid = await getListId(lista);
+      _idByTitle[lista] = {};
+      var url = "/sites/" + sid + "/lists/" + lid + "/items?$select=id&$expand=fields($select=Title)&$top=500";
+      while (url) {
+        var r = await graphCall(url, "GET", null, tok);
+        (r.value || []).forEach(function (it) { var t = it.fields && it.fields.Title; if (t) _idByTitle[lista][t] = it.id; });
+        url = r["@odata.nextLink"] ? r["@odata.nextLink"].replace("https://graph.microsoft.com/v1.0", "") : null;
+      }
+    }
+    _flush();
   }
 
   // Guarda (upsert) la fila de metadatos de una versión desde localStorage.
   async function pushVersion(versionId) {
-    if (!_conectado) { console.warn("pushVersion: sin conexión"); _estado("sin conexión: NO se guarda", "err"); return; }
+    if (!_conectado) { _pending["v:" + versionId] = ["version", versionId]; return; }   // se guarda al conectar
     try {
       var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
       var cols = await getCols(C.listaVersiones), fAnio = interno(cols, "Año");
@@ -178,7 +207,7 @@
 
   // Guarda (upsert) la fila de un hotel de una versión desde localStorage.
   async function pushHotel(versionId, hotelId) {
-    if (!_conectado) { console.warn("pushHotel: sin conexión"); _estado("sin conexión: NO se guarda", "err"); return; }
+    if (!_conectado) { _pending["h:" + versionId + ":" + hotelId] = ["hotel", versionId, hotelId]; return; }   // se guarda al conectar
     try {
       var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
       var hid = String(hotelId), title = versionId + "_" + hid;
@@ -204,21 +233,35 @@
       return;
     }
     var primera = !sessionStorage.getItem("shg_synced");
-    if (primera) document.documentElement.style.visibility = "hidden";  // evita el parpadeo
+    if (primera) {
+      // Primera pantalla de la sesión: descarga TODO a localStorage y recarga para
+      // pintar con datos frescos. Solo aquí se sobrescribe el localStorage.
+      document.documentElement.style.visibility = "hidden";
+      try {
+        await init();
+        if (!cuenta()) { login(); return; }                      // redirige a login corporativo
+        await cargarTodo();
+        sessionStorage.setItem("shg_synced", "1");
+        location.reload();
+      } catch (e) {
+        console.error("Nube no disponible:", e);
+        sessionStorage.setItem("shg_synced", "1");
+        _estado("error: " + e.message, "err");
+        document.documentElement.style.visibility = "";
+      }
+      return;
+    }
+    // Pantallas siguientes: NO se descarga de nuevo (para no pisar lo que calcula
+    // cada pantalla). Solo se lee el índice de ítems para poder guardar.
     try {
       await init();
-      if (!cuenta()) { login(); return; }                        // redirige a login corporativo
-      // SIEMPRE se descarga: así queda establecida la conexión (_conectado) y el
-      // índice de ítems, para que los guardados funcionen también tras la recarga.
-      await cargarTodo();
-      if (primera) { sessionStorage.setItem("shg_synced", "1"); location.reload(); return; }
+      if (!cuenta()) { login(); return; }
+      await cargarIndice();
       _estado("conectado ✓", "ok");
     } catch (e) {
-      console.error("Nube no disponible:", e);
-      sessionStorage.setItem("shg_synced", "1");
+      console.error("Nube:", e);
       _estado("error: " + e.message, "err");
     }
-    document.documentElement.style.visibility = "";
   }
   function conectado() { return _conectado; }
 
