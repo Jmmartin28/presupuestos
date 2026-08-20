@@ -287,7 +287,9 @@ function publicarPpto(){
   const act = localStorage.getItem("shg_version_activa"); if(!act) return;
   try {
     const vs = JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[act]) return;
-    const pc = {}; D.grupos.forEach(g=> pc[g.catClave] = (g._m||Z()).map(v=> Math.round(v)));
+    // Se guarda sin redondear por mes: los informes suman estos 12 meses y redondean
+    // al final igual que la hoja, para que los importes cuadren al euro.
+    const pc = {}; D.grupos.forEach(g=> pc[g.catClave] = (g._m||Z()).slice());
     vs[act].pptoCat = vs[act].pptoCat || {};
     vs[act].pptoCat[D.idHotel] = pc;
     vs[act].modificada = new Date().toISOString();
