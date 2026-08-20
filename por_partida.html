@@ -95,6 +95,13 @@
       el.textContent = "Sin versión activa";
     }
   } catch (e) {}
+  // Propaga el hotel activo (?hotel=) a los enlaces de navegación por hotel.
+  try {
+    var h = new URLSearchParams(location.search).get("hotel");
+    if (h) document.querySelectorAll(".appbar .ab-nav a").forEach(function (a) {
+      a.href += (a.href.indexOf("?") < 0 ? "?" : "&") + "hotel=" + h;
+    });
+  } catch (e) {}
 })();
 </script>
 
