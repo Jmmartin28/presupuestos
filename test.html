@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presupuestos SHG · Prueba de conexión</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
+    --res:#0f766e; --res-bg:#e5f1ef; --gas:#34618e; --neg:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif; }
+  .wrap { max-width:820px; margin:0 auto; padding:26px 18px; }
+  h1 { font-size:22px; margin:0 0 2px; } .sub { color:var(--muted); font-size:13px; margin:0 0 16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .btn { font:inherit; font-size:13px; color:#fff; background:var(--res); border:1px solid var(--res);
+    border-radius:9px; padding:9px 14px; cursor:pointer; }
+  .btn.sec { color:var(--muted); background:var(--panel); border-color:var(--line); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .who { font-size:13px; color:var(--res); font-weight:700; }
+  pre#log { background:#0f141b; color:#d7e0ea; border-radius:10px; padding:12px 14px; font-size:12px;
+    line-height:1.5; max-height:52vh; overflow:auto; white-space:pre-wrap; }
+  .ok { color:#4fd1c5; } .err { color:#ff8a7d; } .info { color:#9fb3c8; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Presupuestos SHG · Prueba de conexión</h1>
+    <div class="sub">Valida el login corporativo y la lectura/escritura en las listas de SharePoint antes de montar la app.</div>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn" id="btnLogin">Iniciar sesión</button>
+        <span class="who" id="who"></span>
+        <span style="flex:1"></span>
+        <button class="btn sec" id="btnLogout" style="display:none">Cerrar sesión</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn" id="btnLeer" disabled>1 · Probar conexión (leer listas)</button>
+        <button class="btn" id="btnEscribir" disabled>2 · Escribir y borrar ítem de prueba</button>
+        <button class="btn sec" id="btnLimpiar">Limpiar registro</button>
+      </div>
+    </div>
+
+    <pre id="log"></pre>
+  </div>
+
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<script src="config.js"></script>
+<script src="shg-cloud.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function log(msg, cls){ const d=document.createElement("div"); if(cls) d.className=cls;
+  d.textContent = new Date().toLocaleTimeString() + "  " + msg; $("log").appendChild(d); $("log").scrollTop=1e9; }
+function err(e){ log("✖ " + (e && e.message ? e.message : e), "err"); }
+
+async function refrescar(){
+  const acc = SHG.cuenta();
+  if (acc){
+    $("who").textContent = "Conectado: " + (acc.username || acc.name || "");
+    $("btnLogin").style.display = "none"; $("btnLogout").style.display = "inline-block";
+    $("btnLeer").disabled = false; $("btnEscribir").disabled = false;
+  } else {
+    $("who").textContent = ""; $("btnLogin").style.display = "inline-block"; $("btnLogout").style.display = "none";
+    $("btnLeer").disabled = true; $("btnEscribir").disabled = true;
+  }
+}
+
+$("btnLogin").addEventListener("click", ()=> SHG.login());
+$("btnLogout").addEventListener("click", ()=> SHG.logout());
+$("btnLimpiar").addEventListener("click", ()=> $("log").innerHTML="");
+
+$("btnLeer").addEventListener("click", async ()=>{
+  try {
+    log("Resolviendo el sitio…", "info");
+    const sid = await SHG.getSiteId(); log("✔ Sitio OK (id: " + sid.split(",").slice(-1)[0] + ")", "ok");
+    for (const nombre of [SHG_CONFIG.listaVersiones, SHG_CONFIG.listaHoteles]){
+      const lid = await SHG.getListId(nombre); log("✔ Lista '" + nombre + "' encontrada", "ok");
+      const cols = await SHG.getCols(nombre);
+      const visibles = Object.keys(cols).filter(k => cols[k] !== k || /^[A-Z]/.test(k));
+      log("   columnas (visible → interno): " + Object.keys(cols)
+          .filter(k=>k!==cols[k]).map(k=>k+"→"+cols[k]).join(", ") || "   (nombres internos = visibles)", "info");
+      const items = await SHG.leerItems(nombre); log("   ítems actuales: " + items.length, "info");
+    }
+    log("CONEXIÓN CORRECTA ✅", "ok");
+  } catch(e){ err(e); }
+});
+
+$("btnEscribir").addEventListener("click", async ()=>{
+  const nombre = SHG_CONFIG.listaVersiones;
+  try {
+    const cols = await SHG.getCols(nombre);
+    const fAnio = SHG.interno(cols, "Año");   // resuelve el nombre interno real (por la ñ)
+    const fields = { Title: "TEST_conexion_" + Date.now(), Nombre: "Prueba", Autor: "conexion" };
+    fields[fAnio] = 2027;
+    log("Creando ítem de prueba en '" + nombre + "'…", "info");
+    const creado = await SHG.crearItem(nombre, fields);
+    log("✔ Creado (id " + creado.id + ", Title=" + creado.fields.Title + ")", "ok");
+    log("Leyendo de vuelta…", "info");
+    const items = await SHG.leerItems(nombre);
+    const encontrado = items.find(x => x.id === creado.id);
+    log("✔ Releído: " + (encontrado ? ("Nombre=" + encontrado.fields.Nombre + ", " + fAnio + "=" + encontrado.fields[fAnio]) : "NO ENCONTRADO"), encontrado ? "ok" : "err");
+    log("Borrando el ítem de prueba…", "info");
+    await SHG.borrarItem(nombre, creado.id);
+    log("✔ Borrado. LECTURA/ESCRITURA CORRECTA ✅", "ok");
+  } catch(e){ err(e); }
+});
+
+(async function(){
+  try { await SHG.init(); log("MSAL listo.", "info"); }
+  catch(e){ err(e); }
+  refrescar();
+})();
+</script>
+</body>
+</html>

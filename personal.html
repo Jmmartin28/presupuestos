@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal · SB Bahía Málaga</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
+    --neg:#c0392b; --manual:#c8862a; --manual-bg:#fbf3e3; --fte-bg:#fdf6e3;
+    --ing:#157347; --gas:#34618e; --gas-bg:#eaf1f8; --res:#0f766e; --res-bg:#e5f1ef; --acc:#0f766e; --acc-bg:#e5f1ef;
+    --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d;
+      --neg:#ff6b5e; --manual:#e0a566; --manual-bg:#33291a; --fte-bg:#2a2413;
+      --ing:#4ac07e; --gas:#6ea8dc; --gas-bg:#152634; --res:#4fd1c5; --res-bg:#14312e; --acc:#4fd1c5; --acc-bg:#14312e;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    font-feature-settings:"tnum" 1; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:99vw; margin:0 auto; padding:22px 14px 60px; }
+  h1 { font-size:22px; margin:0; } .sub { color:var(--muted); font-size:12.5px; margin:2px 0 12px; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end; margin-bottom:10px; }
+  .ctl { display:flex; flex-direction:column; gap:4px; }
+  .ctl label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  .ctl input, .ctl select { padding:6px 8px; border:1px solid var(--line); border-radius:8px;
+    background:var(--panel); color:var(--ink); font:inherit; }
+  .ctl input[type=number] { width:80px; text-align:right; }
+  .btn { font:inherit; font-size:12.5px; color:var(--muted); background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:7px 12px; cursor:pointer; }
+  .btn:hover { color:var(--ink); border-color:var(--muted); }
+  .btn.on { color:var(--acc); border-color:var(--acc); background:var(--acc-bg); }
+  .btn.nav { color:var(--res); border-color:var(--res); }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:16px 0 6px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); overflow:auto; max-height:46vh; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { padding:4px 9px; border-bottom:1px solid var(--line); white-space:nowrap; text-align:right; }
+  thead th { font-size:10.5px; color:var(--muted); text-transform:uppercase; font-weight:600;
+    position:sticky; top:0; background:var(--panel); z-index:3; }
+  th.lbl, td.lbl { text-align:left; position:sticky; left:0; background:var(--panel); z-index:2; min-width:180px; }
+  td.num { font-variant-numeric:tabular-nums; }
+  td.tot, th.tot { border-left:2px solid var(--line); font-weight:600; }
+  .mes { }  table.solo-anual td.mes, table.solo-anual th.mes { display:none; }
+  .delta { display:inline-block; margin-left:5px; font-size:9.5px; }
+  .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
+  input.c { width:52px; font:inherit; font-size:11.5px; text-align:right; padding:2px 4px;
+    border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+  input.c.manual { background:var(--manual-bg); color:var(--manual); font-weight:600; border-color:var(--manual); }
+  td.fte input.c { background:var(--fte-bg); }
+  .ref { display:block; font-size:9px; color:var(--muted); }
+  tr.plant td, tr.total td { font-weight:700; background:var(--gas-bg); }
+  tr.plant td.lbl, tr.total td.lbl { color:var(--gas); background:var(--gas-bg); }
+  tr.rep td { font-weight:700; background:var(--acc-bg); } tr.rep td.lbl { color:var(--acc); background:var(--acc-bg); }
+  td.pctcol { border-left:1px solid var(--line); background:var(--bg); }
+  .del { color:var(--neg); cursor:pointer; margin-right:6px; font-weight:700; }
+  footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js"></script><script src="shg-cloud.js"></script><script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
+<style>
+  .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
+    flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(20,30,50,.05); }
+  .appbar .ab-home { font:inherit; font-size:12.5px; font-weight:700; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 11px;
+    text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .appbar .ab-home:hover { border-color:var(--gas); color:var(--gas); }
+  .appbar .ab-nav { display:flex; flex-wrap:wrap; gap:5px; }
+  .appbar .ab-nav a { font-size:12px; color:var(--muted); text-decoration:none; border:1px solid transparent;
+    border-radius:7px; padding:5px 9px; white-space:nowrap; }
+  .appbar .ab-nav a:hover { color:var(--ink); border-color:var(--line); }
+  .appbar .ab-nav a.on { color:var(--gas); border-color:var(--gas); background:var(--gas-bg); font-weight:700; }
+  .appbar .ab-sp { flex:1; }
+  .appbar .ab-ver { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px;
+    padding:5px 12px; white-space:nowrap; }
+  .appbar .ab-ver.on { color:var(--res); border-color:var(--res); background:var(--res-bg); font-weight:700; }
+</style>
+<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="on" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
+<script>
+(function(){
+  try {
+    var act = localStorage.getItem("shg_version_activa");
+    var vs = JSON.parse(localStorage.getItem("shg_versiones") || "{}");
+    var el = document.getElementById("abVer");
+    if (act && vs[act]) {
+      el.textContent = "Versión: " + vs[act].nombre + " · " + vs[act].anio;
+      el.classList.add("on");
+    } else {
+      el.textContent = "Sin versión activa";
+    }
+  } catch (e) {}
+})();
+</script>
+
+  <div class="wrap">
+    <h1>Personal · <span id="tit">SB Bahía Málaga</span></h1>
+    <div class="sub">Consultora Hotelera, SL · Personal 2027 · pestaña Bahía · plantilla = Σ(FTE×sueldo); absentismo/vacaciones/eventos = % de la plantilla (editable y con override manual)</div>
+    <div class="controls">
+      <div class="ctl"><label>Hotel</label><select id="selHotel"></select></div>
+      <button class="btn nav" id="navPpto">← Presupuesto</button>
+      <div class="ctl"><label>% Absentismo</label><input type="number" id="pAbs" step="0.5"></div>
+      <div class="ctl"><label>% Vacaciones</label><input type="number" id="pVac" step="0.5"></div>
+      <div class="ctl"><label>% Eventos</label><input type="number" id="pEve" step="0.5"></div>
+      <button class="btn" id="compR">Comprimir meses</button>
+      <span id="savedHint" style="font-size:11.5px;color:var(--res);align-self:center;transition:opacity .4s;"></span>
+      <div class="ctl" style="margin-left:auto"><label>Referencia de FTE</label><select id="refBase"><option value="fc">Forecast 2026</option><option value="prev">Año anterior</option></select></div>
+    </div>
+    <h2>Resumen y reparto</h2>
+    <div class="card"><table id="tR"><thead><tr id="cabR"></tr></thead><tbody id="cuerpoR"></tbody></table></div>
+    <h2>Puestos (FTE por mes y sueldo €/FTE)</h2>
+    <div style="margin:6px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <button class="btn" id="addPuesto">+ Añadir puesto</button>
+      <button class="btn" id="borrarFte">Borrar FTE</button>
+      <span style="flex:1"></span>
+      <label style="font-size:11px;color:var(--muted)">Copiar puestos de</label>
+      <select id="copiaHotel" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit"></select>
+      <button class="btn" id="copiar" disabled>Copiar</button>
+    </div>
+    <div class="card" style="max-height:40vh"><table id="tP"><thead><tr id="cabP"></tr></thead><tbody id="cuerpoP"></tbody></table></div>
+    <footer>App de Presupuestos SHG · página de Personal · Sueldos = 70% · Seguros Sociales = 30% · Uniformidad → Uniformes</footer>
+  </div>
+<script>
+const D = {"hotel": "SB Bahía Málaga", "idHotel": 4, "hoteles": [{"id": 23, "nombre": "AT Museo"}, {"id": 67, "nombre": "Bahía Malaga S.L."}, {"id": 44, "nombre": "CENTRAL ESPAÑA"}, {"id": 104, "nombre": "Computatrum"}, {"id": 57, "nombre": "Córdoba Colón"}, {"id": 101, "nombre": "El Arenal"}, {"id": 59, "nombre": "FACILITIES"}, {"id": 73, "nombre": "Gestor Hotelero Urbano"}, {"id": 66, "nombre": "Hitaca Hotels & Resorts"}, {"id": 53, "nombre": "Hoy no me puedo levantar"}, {"id": 97, "nombre": "ITC Aptos Córdoba"}, {"id": 56, "nombre": "ITC Artemisa"}, {"id": 64, "nombre": "ITC Barcelona"}, {"id": 81, "nombre": "ITC Ciudad de Haro"}, {"id": 90, "nombre": "ITC Cádiz"}, {"id": 75, "nombre": "ITC Infantas"}, {"id": 54, "nombre": "ITC Jerez"}, {"id": 77, "nombre": "ITC Madrid"}, {"id": 61, "nombre": "ITC Madrid Alcalá Norte"}, {"id": 18, "nombre": "ITC Salamanca"}, {"id": 55, "nombre": "ITC Sevilla"}, {"id": 65, "nombre": "MD Almerimar"}, {"id": 80, "nombre": "MD Portomagno"}, {"id": 69, "nombre": "MD Puerto"}, {"id": 68, "nombre": "Maral Hostelera, SL"}, {"id": 103, "nombre": "OH Balear"}, {"id": 102, "nombre": "Residencia La15 Palmera"}, {"id": 100, "nombre": "Residencia la15 Triana"}, {"id": 96, "nombre": "SB Academy"}, {"id": 4, "nombre": "SB Bahía Málaga"}, {"id": 17, "nombre": "SB Capuchinos"}, {"id": 34, "nombre": "SB Castillo de Santa Catalina"}, {"id": 38, "nombre": "SB Columela"}, {"id": 19, "nombre": "SB Congreso"}, {"id": 93, "nombre": "SB Duques de Medinaceli"}, {"id": 95, "nombre": "SB Gran Vía 76"}, {"id": 87, "nombre": "SB Granada"}, {"id": 5, "nombre": "SB Jerez"}, {"id": 99, "nombre": "SB La Victoria"}, {"id": 2, "nombre": "SB Los Naranjos"}, {"id": 91, "nombre": "SB Murcia"}, {"id": 3, "nombre": "SB Málaga"}, {"id": 15, "nombre": "SB Oviedo"}, {"id": 20, "nombre": "SB Palacio S. Gabriel"}, {"id": 52, "nombre": "SB Palacio de Pombo"}, {"id": 37, "nombre": "SB Palillero"}, {"id": 9, "nombre": "SB Salamanca"}, {"id": 92, "nombre": "SB Sardinero"}, {"id": 33, "nombre": "SB Urban"}, {"id": 7, "nombre": "SB Vistahermosa (44 AT)"}, {"id": 71, "nombre": "SB la Harinera"}, {"id": 98, "nombre": "Urania Cádiz"}], "anioObjetivo": 2027, "anioAnt": 2025, "anioAct": 2026, "personal": {"puestos": [{"nombre": "Jefe recepción", "fteFc": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "sueldoFc": 3497.0, "ftePrev": [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "sueldoPrev": 3384.45}, {"nombre": "Recepcionistas", "fteFc": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], "sueldoFc": 3042.0, "ftePrev": [0.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], "sueldoPrev": 2944.51}, {"nombre": "Auditor de noche", "fteFc": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "sueldoFc": 3320.0, "ftePrev": [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "sueldoPrev": 3217.81}, {"nombre": "Subgobernanta", "fteFc": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "sueldoFc": 2840.0, "ftePrev": [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "sueldoPrev": 2747.93}, {"nombre": "Pisos", "fteFc": [2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6], "sueldoFc": 2840.0, "ftePrev": [1.2, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5], "sueldoPrev": 2747.92}, {"nombre": "Camareros desayunos", "fteFc": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], "sueldoFc": 2840.0, "ftePrev": [0.0, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6], "sueldoPrev": 2727.22}, {"nombre": "Vacaciones recepción", "fteFc": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "sueldoFc": 0.0, "ftePrev": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0], "sueldoPrev": 2942.5}, {"nombre": "Vacaciones pisos", "fteFc": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "sueldoFc": 0.0, "ftePrev": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0], "sueldoPrev": 2747.92}, {"nombre": "Vacaciones sala", "fteFc": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "sueldoFc": 0.0, "ftePrev": [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0], "sueldoPrev": 2727.22}, {"nombre": "Camareros terraza", "fteFc": [1.0, 1.0, 1.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.0], "sueldoFc": 2840.0, "ftePrev": [0.0, 1.0, 1.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.0], "sueldoPrev": 2727.2}], "pct": {"absentismo": 0.08, "vacaciones": 0.12, "eventos": 0.0}, "unifFc": [150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0], "unifPrev": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}};
+const P = D.personal;
+const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const Z = () => new Array(12).fill(0);
+const g3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const n0 = x => (x<0?"-":"") + g3(String(Math.round(Math.abs(x))));
+const n1 = x => (Math.round(x*10)/10).toLocaleString("es-ES",{minimumFractionDigits:1,maximumFractionDigits:1});
+const $ = id => document.getElementById(id);
+const sum = a => a.reduce((x,y)=>x+y,0);
+const parse = s => { const v=parseFloat(String(s).replace(/\./g,"").replace(",",".")); return isNaN(v)?null:v; };
+const RB = () => $("refBase").value;
+
+// Estado
+$("pAbs").value = (P.pct.absentismo*100).toFixed(1);
+$("pVac").value = (P.pct.vacaciones*100).toFixed(1);
+$("pEve").value = (P.pct.eventos*100).toFixed(1);
+P.puestos.forEach(p => { p.fte = p.fteFc.slice(); p.sueldo = p.sueldoFc; });   // arranca del forecast
+const unifManual = P.unifFc.slice();
+const manual = { abs:Z().map(()=>null), vac:Z().map(()=>null), eve:Z().map(()=>null) };
+
+// ---- Autoguardado sobre la versión activa ----
+function _activeVer(){ try{ const a=localStorage.getItem("shg_version_activa");
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?a:null; }catch(e){ return null; } }
+function estadoPers(){ return { puestos:P.puestos, pAbs:$("pAbs").value, pVac:$("pVac").value,
+  pEve:$("pEve").value, manual:manual, unif:unifManual }; }
+let _saveT=null;
+function guardarPers(){ const a=_activeVer(), h=$("savedHint");
+  if(!a){ if(h){ h.textContent="Sin versión activa"; h.style.opacity=1; } return; }
+  clearTimeout(_saveT); _saveT=setTimeout(()=>{ try{
+    const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[a]) return;
+    vs[a].personal=vs[a].personal||{}; vs[a].personal[D.idHotel]=estadoPers();
+    vs[a].modificada=new Date().toISOString();
+    localStorage.setItem("shg_versiones", JSON.stringify(vs));
+    if(window.SHG) SHG.pushHotel(a, D.idHotel);   // guardar en SharePoint
+    if(h){ h.textContent="Guardado ✓"; h.style.opacity=1; clearTimeout(guardarPers._t); guardarPers._t=setTimeout(()=>h.style.opacity=0,1500); }
+  }catch(e){} }, 400); }
+function cargarPers(){ const a=_activeVer(); if(!a) return; try{
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+  const s=vs[a]&&vs[a].personal&&vs[a].personal[D.idHotel]; if(!s) return;
+  if(Array.isArray(s.puestos)) P.puestos=s.puestos;
+  if(s.pAbs!=null)$("pAbs").value=s.pAbs; if(s.pVac!=null)$("pVac").value=s.pVac; if(s.pEve!=null)$("pEve").value=s.pEve;
+  if(s.manual){ ["abs","vac","eve"].forEach(k=>{ if(Array.isArray(s.manual[k])) s.manual[k].forEach((v,i)=>manual[k][i]=v); }); }
+  if(Array.isArray(s.unif)) s.unif.forEach((v,i)=>unifManual[i]=v);
+}catch(e){} }
+
+function plantillaMes(fteKey, sueldoKey){ return M.map((_,i)=> P.puestos.reduce((a,p)=> a + (p[fteKey][i]||0)*(p[sueldoKey]||0), 0)); }
+function pctVal(id){ return (parseFloat($(id).value)||0)/100; }
+
+function escenario(fteKey, sueldoKey, usarManual){
+  const plant = plantillaMes(fteKey, sueldoKey);
+  const abs = M.map((_,i)=> usarManual&&manual.abs[i]!=null?manual.abs[i]: pctVal("pAbs")*plant[i]);
+  const vac = M.map((_,i)=> usarManual&&manual.vac[i]!=null?manual.vac[i]: pctVal("pVac")*plant[i]);
+  const eve = M.map((_,i)=> usarManual&&manual.eve[i]!=null?manual.eve[i]: pctVal("pEve")*plant[i]);
+  const unif = usarManual ? unifManual : P.unifPrev;
+  const base = M.map((_,i)=> plant[i]+abs[i]+vac[i]+eve[i]);
+  const nemp = M.map((_,i)=> P.puestos.reduce((a,p)=> a+(p[fteKey][i]||0),0));
+  return { plant, abs, vac, eve, unif, base, nemp,
+    sueldos: base.map(x=>x*0.7), segsoc: base.map(x=>x*0.3), uniformes: unif.slice(),
+    total: M.map((_,i)=> base[i]+unif[i]) };
+}
+
+function recompute(){
+  const cur = escenario("fte","sueldo", true);
+  const ref = RB()==="prev" ? escenario("ftePrev","sueldoPrev", false) : escenario("fteFc","sueldoFc", false);
+  window._cur=cur; window._ref=ref;
+  writeResumen(cur, ref); writePuestos();
+}
+
+function celD(v, r, fmt){ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`; if(r!=null){ const dv=v-r, p=Math.abs(r)>0.5?dv/Math.abs(r)*100:0;
+  const cls = dv<0 ? "up" : "down";   // coste: subir = rojo, bajar = verde
+  h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } return h; }
+
+function writeResumen(c, r){
+  const set = (id, serie, refserie, delta, fmt)=>{ fmt=fmt||n0; serie.forEach((v,i)=>{ const e=$(id+"-"+i); if(e){ e.innerHTML= delta&&refserie?celD(v,refserie[i],fmt):fmt(v);} });
+    const t=$(id+"-t"); if(t) t.innerHTML = delta&&refserie?celD(sum(serie),sum(refserie),fmt):fmt(sum(serie)); };
+  set("plant", c.plant, r.plant, true);
+  // filas % con input manual: escribir en los inputs
+  ["abs","vac","eve"].forEach(k=>{ c[k].forEach((v,i)=>{ const e=$(k+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); e.classList.toggle("manual", manual[k][i]!=null); } });
+    const t=$(k+"-t"); if(t) t.textContent=n0(sum(c[k])); });
+  c.unif.forEach((v,i)=>{ const e=$("unif-"+i); if(e && document.activeElement!==e) e.value=n0(v); });
+  $("unif-t").textContent=n0(sum(c.unif));
+  set("nemp", c.nemp, r.nemp, true, n1);
+  set("total", c.total, r.total, true);
+  set("sueldos", c.sueldos, r.sueldos, true);
+  set("segsoc", c.segsoc, r.segsoc, true);
+  set("uniformes", c.uniformes, r.uniformes, true);
+}
+
+// ---- Construcción tabla resumen ----
+function meses(pfx, editable, cls){ return M.map((_,i)=> editable
+  ? `<td class="num mes ${cls||''}"><input class="c" id="${pfx}-${i}" data-p="${pfx}" data-m="${i}"></td>`
+  : `<td class="num mes" id="${pfx}-${i}"></td>`).join(""); }
+function filaR(cls,id,label,editable){ return `<tr class="${cls}"><td class="lbl">${label}</td>`
+  + meses(id, editable) + `<td class="num tot" id="${id}-t"></td></tr>`; }
+
+$("cabR").innerHTML='<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}</th>`).join("")+'<th class="num tot">Año</th>';
+$("cuerpoR").innerHTML =
+    filaR("plant","plant","Plantilla permanente",false)
+  + filaR("","abs","Absentismo",true) + filaR("","vac","Vacaciones",true) + filaR("","eve","Eventos",true)
+  + filaR("","unif","Uniformidad",true)
+  + filaR("","nemp","Nº empleados (FTE)",false)
+  + filaR("total","total","TOTAL COSTE",false)
+  + `<tr class="rep"><td class="lbl" colspan="99" style="text-align:left">Reparto a USALI</td></tr>`
+  + filaR("rep","sueldos","Sueldos y salarios (70%)",false)
+  + filaR("rep","segsoc","Seguros Sociales (30%)",false)
+  + filaR("rep","uniformes","Uniformes",false);
+
+// ---- Construcción tabla puestos ----
+$("cabP").innerHTML='<th class="lbl">Puesto</th>'+M.map(m=>`<th class="num mes">${m}</th>`).join("")+'<th class="num tot">Sueldo €/FTE</th>';
+function writePuestos(){
+  $("cuerpoP").innerHTML = P.puestos.map((p,pi)=>{
+    const refFte = RB()==="prev"?p.ftePrev:p.fteFc;
+    const celdasFte = M.map((_,i)=>`<td class="num mes fte"><input class="c" data-pi="${pi}" data-m="${i}" value="${p.fte[i]?n1(p.fte[i]):''}"><span class="ref">${refFte[i]?n1(refFte[i]):''}</span></td>`).join("");
+    return `<tr><td class="lbl"><span class="del" data-del="${pi}">×</span><input class="c" style="width:150px;text-align:left" data-nom="${pi}" value="${p.nombre.replace(/"/g,'&quot;')}"></td>`
+      + celdasFte + `<td class="num tot"><input class="c" data-sue="${pi}" value="${p.sueldo?n0(p.sueldo):''}"></td></tr>`;
+  }).join("");
+  enlazarPuestos();
+}
+function enlazarPuestos(){
+  document.querySelectorAll('input.c[data-pi]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.pi].fte[+inp.dataset.m]=parse(inp.value)||0; recomputeSoloResumen(); guardarPers(); }));
+  document.querySelectorAll('input.c[data-sue]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.sue].sueldo=parse(inp.value)||0; recomputeSoloResumen(); guardarPers(); }));
+  document.querySelectorAll('input.c[data-nom]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.nom].nombre=inp.value; guardarPers(); }));
+  document.querySelectorAll('.del').forEach(x=>x.addEventListener("click",()=>{ P.puestos.splice(+x.dataset.del,1); recompute(); guardarPers(); }));
+}
+function recomputeSoloResumen(){ const cur=escenario("fte","sueldo",true); const ref=RB()==="prev"?escenario("ftePrev","sueldoPrev",false):escenario("fteFc","sueldoFc",false); window._cur=cur; writeResumen(cur,ref); }
+
+// selector de hoteles
+D.hoteles.forEach(h=>{ const o=document.createElement("option"); o.value=h.id; o.textContent=h.nombre; if(h.id===D.idHotel)o.selected=true; $("selHotel").appendChild(o); });
+
+// interacción resumen
+["abs","vac","eve"].forEach(k=>{ for(let i=0;i<12;i++){ /* inputs creados; listeners abajo */ } });
+document.querySelectorAll('#cuerpoR input.c').forEach(inp=>{
+  inp.addEventListener("input",()=>{ const p=inp.dataset.p, m=+inp.dataset.m, v=inp.value.trim()===""?null:parse(inp.value);
+    if(p==="unif"){ unifManual[m]= v==null?0:v; } else { manual[p][m]=v; } recomputeSoloResumen(); guardarPers(); });
+  inp.addEventListener("blur",()=>{ const p=inp.dataset.p, m=+inp.dataset.m; if(p!=="unif" && manual[p][m]==null){ inp.value=n0(window._cur[p][m]); inp.classList.remove("manual"); } });
+});
+["pAbs","pVac","pEve"].forEach(id=>$(id).addEventListener("input",()=>{ recomputeSoloResumen(); guardarPers(); }));
+$("refBase").addEventListener("change",recompute);
+$("compR").addEventListener("click",()=>{ const s1=$("tR").classList.toggle("solo-anual"); $("tP").classList.toggle("solo-anual",s1);
+  $("compR").textContent=s1?"Ver meses":"Comprimir meses"; $("compR").classList.toggle("on",s1); });
+$("addPuesto").addEventListener("click",()=>{ P.puestos.push({nombre:"Nuevo puesto",fte:Z(),sueldo:0,fteFc:Z(),sueldoFc:0,ftePrev:Z(),sueldoPrev:0}); recompute(); guardarPers(); });
+$("borrarFte").addEventListener("click",()=>{ P.puestos.forEach(p=>p.fte=Z()); recompute(); guardarPers(); });
+// Copiar puestos (estructura + FTE + sueldo) de otro hotel guardado en la versión.
+$("copiaHotel").innerHTML='<option value="">Elige un hotel…</option>'
+  + D.hoteles.filter(h=>h.id!==D.idHotel).map(h=>`<option value="${h.id}">${h.nombre}</option>`).join("");
+$("copiaHotel").addEventListener("change",()=> $("copiar").disabled = !$("copiaHotel").value);
+$("copiar").addEventListener("click",()=>{
+  if(!$("copiaHotel").value) return;
+  const a=_activeVer();
+  if(!a){ alert("Abre o crea una versión activa (en Inicio) para copiar puestos."); return; }
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+  const src=+$("copiaHotel").value, nom=$("copiaHotel").selectedOptions[0].textContent;
+  const sp = vs[a] && vs[a].personal && vs[a].personal[src];
+  if(!sp || !Array.isArray(sp.puestos) || !sp.puestos.length){
+    alert(`"${nom}" no tiene puestos guardados en esta versión. Edítalo primero.`); return; }
+  if(!confirm(`¿Copiar los puestos y FTE de "${nom}" sobre este hotel? Se sustituyen los puestos actuales.`)) return;
+  P.puestos = sp.puestos.map(p=>({ nombre:p.nombre||"", fte:Array.isArray(p.fte)?p.fte.slice():Z(), sueldo:p.sueldo||0,
+    fteFc:Z(), sueldoFc:0, ftePrev:Z(), sueldoPrev:0 }));
+  recompute(); guardarPers();
+});
+$("navPpto").addEventListener("click",()=>alert("En la app: vuelve a la hoja de presupuesto de este hotel."));
+$("selHotel").addEventListener("change",()=>alert("En la app: recarga el Personal del hotel seleccionado."));
+
+cargarPers();
+writePuestos();
+recompute();
+</script>
+</body>
+</html>

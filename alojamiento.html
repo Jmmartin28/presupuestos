@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alojamiento · SB Bahía Málaga</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
+    --ing:#157347; --ing-bg:#e8f3ec; --inp:#0f766e; --inp-bg:#e5f1ef; --neg:#c0392b;
+    --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d;
+      --ing:#4ac07e; --ing-bg:#15301f; --inp:#4fd1c5; --inp-bg:#14312e; --neg:#ff6b5e;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    font-feature-settings:"tnum" 1; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:99vw; margin:0 auto; padding:26px 16px 60px; }
+  table.solo-anual td.mes, table.solo-anual th.mes { display:none; }
+  h1 { font-size:23px; margin:0; }
+  .sub { color:var(--muted); font-size:13px; margin:2px 0 16px; }
+  .hint { font-size:12.5px; color:var(--muted); margin:0 0 12px; }
+  .controls { display:flex; flex-wrap:wrap; gap:12px 18px; align-items:flex-end; margin-bottom:12px; }
+  .ctl { display:flex; flex-direction:column; gap:4px; }
+  .ctl label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  .ctl input { width:96px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
+    background:var(--panel); color:var(--ink); font:inherit; text-align:right; }
+  .btn { font:inherit; font-size:12.5px; color:var(--muted); background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:8px 14px; cursor:pointer; }
+  .btn:hover { color:var(--ink); border-color:var(--muted); }
+  .btn.on { color:var(--inp); border-color:var(--inp); background:var(--inp-bg); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    box-shadow:var(--shadow); overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:5px 10px; border-bottom:1px solid var(--line); white-space:nowrap; text-align:right; }
+  thead th { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em;
+    font-weight:600; position:sticky; top:0; background:var(--panel); z-index:2; }
+  th.lbl, td.lbl { text-align:left; position:sticky; left:0; background:var(--panel); z-index:1;
+    min-width:170px; }
+  td.num { font-variant-numeric:tabular-nums; }
+  td.tot { border-left:2px solid var(--line); font-weight:600; }
+  th.tot { border-left:2px solid var(--line); }
+  tr.ref td { color:var(--muted); }
+  tr.calc td.num, tr.calc td.tot { font-weight:600; }
+  tr.ventas td { font-weight:700; background:var(--ing-bg); }
+  tr.ventas td.lbl { color:var(--ing); background:var(--ing-bg); }
+  tr.sec td { font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted);
+    font-weight:700; padding-top:14px; border-bottom:none; background:var(--panel); text-align:left; }
+  tr.inp td.lbl { color:var(--inp); font-weight:600; background:var(--inp-bg); }
+  tr.inp td { background:var(--inp-bg); }
+  input.c { width:64px; font:inherit; font-size:12.5px; text-align:right; padding:3px 5px;
+    border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+  input.c:focus { outline:2px solid var(--inp); border-color:var(--inp); }
+  .delta { display:inline-block; margin-left:6px; font-size:10px; }
+  .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
+  td.icell { text-align:right; white-space:nowrap; }
+  td.icell input.c { width:56px; }
+  footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js"></script><script src="shg-cloud.js"></script><script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
+<style>
+  .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
+    flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(20,30,50,.05); }
+  .appbar .ab-home { font:inherit; font-size:12.5px; font-weight:700; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 11px;
+    text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .appbar .ab-home:hover { border-color:var(--gas); color:var(--gas); }
+  .appbar .ab-nav { display:flex; flex-wrap:wrap; gap:5px; }
+  .appbar .ab-nav a { font-size:12px; color:var(--muted); text-decoration:none; border:1px solid transparent;
+    border-radius:7px; padding:5px 9px; white-space:nowrap; }
+  .appbar .ab-nav a:hover { color:var(--ink); border-color:var(--line); }
+  .appbar .ab-nav a.on { color:var(--gas); border-color:var(--gas); background:var(--gas-bg); font-weight:700; }
+  .appbar .ab-sp { flex:1; }
+  .appbar .ab-ver { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px;
+    padding:5px 12px; white-space:nowrap; }
+  .appbar .ab-ver.on { color:var(--res); border-color:var(--res); background:var(--res-bg); font-weight:700; }
+</style>
+<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="on" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
+<script>
+(function(){
+  try {
+    var act = localStorage.getItem("shg_version_activa");
+    var vs = JSON.parse(localStorage.getItem("shg_versiones") || "{}");
+    var el = document.getElementById("abVer");
+    if (act && vs[act]) {
+      el.textContent = "Versión: " + vs[act].nombre + " · " + vs[act].anio;
+      el.classList.add("on");
+    } else {
+      el.textContent = "Sin versión activa";
+    }
+  } catch (e) {}
+})();
+</script>
+
+  <div class="wrap">
+    <h1>Alojamiento · SB Bahía Málaga</h1>
+    <div class="sub">Consultora Hotelera, SL · 44 habitaciones · Ingresos de alojamiento 2027</div>
+    <p class="hint">Introduce la <b>Ocupación 2027</b> (en nº de noches o en %) y el <b>ADR 2027</b> por mes.
+      La venta de alojamiento = Ocupación × ADR. Los días son editables (hoteles que no abren todo el mes).
+      Arranca con los datos del año en curso; ajústalos.</p>
+    <div class="controls">
+      <div class="ctl"><label>Incremento ingresos % (ADR)</label><input type="number" id="incIng" value="0" step="0.5"></div>
+      <button class="btn" id="comprimir">Comprimir meses</button>
+      <button class="btn" id="limpiar">Limpiar Datos</button>
+      <span id="savedHint" style="font-size:11.5px;color:var(--inp);align-self:center;transition:opacity .4s;"></span>
+    </div>
+    <div class="card">
+      <table id="t"><thead><tr id="cab"></tr></thead><tbody id="cuerpo"></tbody></table>
+    </div>
+    <footer>App de Presupuestos SHG · página de alojamiento · datos reales del grupo</footer>
+  </div>
+<script>
+const D = {"hotel": "SB Bahía Málaga", "idHotel": 4, "anioObjetivo": 2027, "anioAnt": 2025, "anioAct": 2026, "hab": 44, "diasDef": [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31], "v25": [109861.0, 114146.0, 145558.0, 173640.0, 184866.0, 158658.0, 154031.0, 181240.0, 184393.0, 180484.0, 132349.0, 140006.0], "v26": [107031.0, 118554.0, 158746.0, 186711.0, 201547.0, 171950.0, 171774.0, 185000.0, 195000.0, 200000.0, 155000.0, 165000.0], "ocu25": [1229.0, 1134.0, 1193.0, 1247.0, 1305.0, 1213.0, 1259.0, 1320.0, 1270.0, 1230.0, 1184.0, 1138.0], "disp25": [1364.0, 1232.0, 1364.0, 1320.0, 1364.0, 1320.0, 1364.0, 1364.0, 1320.0, 1364.0, 1320.0, 1364.0], "ocu26": [1167.0, 1105.0, 1259.0, 1233.0, 1253.0, 1239.0, 1316.0, 1300.0, 1250.0, 1300.0, 1250.0, 1300.0], "disp26": [1364.0, 1232.0, 1364.0, 1320.0, 1364.0, 1320.0, 1364.0, 1364.0, 1320.0, 1364.0, 1320.0, 1364.0], "pct25": [90.1, 92.0, 87.5, 94.5, 95.7, 91.9, 92.3, 96.8, 96.2, 90.2, 89.7, 83.4], "pct26": [85.6, 89.7, 92.3, 93.4, 91.9, 93.9, 96.5, 95.3, 94.7, 95.3, 94.7, 95.3], "adr25": [89.39, 100.66, 122.01, 139.25, 141.66, 130.8, 122.34, 137.3, 145.19, 146.73, 111.78, 123.03], "adr26": [91.71, 107.29, 126.09, 151.43, 160.85, 138.78, 130.53, 142.31, 156.0, 153.85, 124.0, 126.92]};
+const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const g3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");     // separador de miles siempre
+const n0 = x => (x < 0 ? "-" : "") + g3(String(Math.round(Math.abs(x))));
+const n1 = x => {
+  const neg = x < 0; x = Math.abs(x);
+  let e = Math.floor(x), d = Math.round((x - e) * 10);
+  if (d === 10) { e += 1; d = 0; }
+  return (neg ? "-" : "") + g3(String(e)) + "," + d;
+};
+const sgn = x => (x >= 0 ? "+" : "") + n0(x);
+const eur = x => n1(x) + " €";
+const pctS = x => n1(x) + " %";
+const $ = id => document.getElementById(id);
+const sum = a => a.reduce((x,y)=>x+y,0);
+
+// Estado editable del ejercicio objetivo: arranca desde el año en curso (editable).
+const S = { dias: D.diasDef.slice(), ocu: D.ocu26.slice(), adr: D.adr26.slice() };
+
+// ---- Autoguardado sobre la versión activa ----
+function _activeVer(){ try{ const a=localStorage.getItem("shg_version_activa");
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?a:null; }catch(e){ return null; } }
+let _saveT=null;
+function guardarAloj(){ const a=_activeVer(), h=$("savedHint");
+  if(!a){ if(h){ h.textContent="Sin versión activa"; h.style.opacity=1; } return; }
+  clearTimeout(_saveT); _saveT=setTimeout(()=>{ try{
+    const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[a]) return;
+    vs[a].alojamiento=vs[a].alojamiento||{};
+    vs[a].alojamiento[D.idHotel]={ dias:S.dias, ocu:S.ocu, adr:S.adr, incIng:parseFloat($("incIng").value)||0 };
+    vs[a].modificada=new Date().toISOString();
+    localStorage.setItem("shg_versiones", JSON.stringify(vs));
+    if(window.SHG) SHG.pushHotel(a, D.idHotel);   // guardar en SharePoint
+    if(h){ h.textContent="Guardado ✓"; h.style.opacity=1; clearTimeout(guardarAloj._t); guardarAloj._t=setTimeout(()=>h.style.opacity=0,1500); }
+  }catch(e){} }, 400); }
+(function cargarAloj(){ const a=_activeVer(); if(!a) return; try{
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+  const s=vs[a]&&vs[a].alojamiento&&vs[a].alojamiento[D.idHotel]; if(!s) return;
+  if(Array.isArray(s.dias)) S.dias=s.dias.slice();
+  if(Array.isArray(s.ocu)) S.ocu=s.ocu.slice();
+  if(Array.isArray(s.adr)) S.adr=s.adr.slice();
+  if(s.incIng!=null){ const e=$("incIng"); if(e) e.value=s.incIng; }
+}catch(e){} })();
+const disp = () => S.dias.map(d => d * D.hab);
+const pct = () => S.ocu.map((o,i)=> { const d=S.dias[i]*D.hab; return d? o/d*100:0; });
+const ventas = () => S.ocu.map((o,i)=> o * S.adr[i]);
+const wadr = (v,o)=> sum(o)? sum(v)/sum(o):0;
+const wpct = (o,d)=> sum(d)? sum(o)/sum(d)*100:0;
+
+$("cab").innerHTML = '<th class="lbl">Concepto</th>' + M.map(m=>`<th class="num mes">${m}</th>`).join("")
+  + '<th class="num tot">Año</th>';
+
+function ref(label,arr,fmt,tot){ return `<tr class="ref"><td class="lbl">${label}</td>`
+  + arr.map(v=>`<td class="num mes">${fmt(v)}</td>`).join("") + `<td class="num tot">${fmt(tot)}</td></tr>`; }
+function calc(cls,id,label){ return `<tr class="calc ${cls}"><td class="lbl">${label}</td>`
+  + M.map((_,i)=>`<td class="num mes"><span class="amt" id="${id}-${i}"></span><span class="delta" id="${id}-${i}d"></span></td>`).join("")
+  + `<td class="num tot"><span class="amt" id="${id}-t"></span><span class="delta" id="${id}-td"></span></td></tr>`; }
+function inp(key,label,fmt,init){ const a = init || S[key]; return `<tr class="inp"><td class="lbl">${label}</td>`
+  + M.map((_,i)=>`<td class="icell mes"><input class="c" data-k="${key}" data-m="${i}" value="${fmt(a[i])}"><span class="delta" id="${key}-${i}d"></span></td>`).join("")
+  + `<td class="num tot"><span class="amt" id="${key}-t"></span><span class="delta" id="${key}-td"></span></td></tr>`; }
+
+$("cuerpo").innerHTML =
+  `<tr class="sec"><td colspan="99">Ventas de alojamiento (€)</td></tr>`
+  + ref("Real 2025", D.v25, n0, sum(D.v25))
+  + ref("Forecast 2026", D.v26, n0, sum(D.v26))
+  + calc("ventas","v27","Ppto 2027")
+  + `<tr class="sec"><td colspan="99">Ocupación y ADR</td></tr>`
+  + inp("dias","Días 2027", n0)
+  + calc("","disp27","Disponibilidad 2027")
+  + ref("Ocupación nº 2025", D.ocu25, n0, sum(D.ocu25))
+  + ref("Ocupación nº 2026", D.ocu26, n0, sum(D.ocu26))
+  + inp("ocu","Ocupación nº 2027", n0)
+  + ref("Ocupación % 2025", D.pct25, pctS, wpct(D.ocu25,D.disp25))
+  + ref("Ocupación % 2026", D.pct26, pctS, wpct(D.ocu26,D.disp26))
+  + inp("pct","Ocupación % 2027", n1, pct())
+  + ref("ADR 2025", D.adr25, eur, wadr(D.v25,D.ocu25))
+  + ref("ADR 2026", D.adr26, eur, wadr(D.v26,D.ocu26))
+  + inp("adr","ADR 2027", n1);
+
+function setInput(k, i, txt){
+  const el = document.querySelector(`input.c[data-k="${k}"][data-m="${i}"]`);
+  if (el && document.activeElement !== el) el.value = txt;
+}
+const dispM = i => S.dias[i] * D.hab;
+const pctM = i => { const d = dispM(i); return d ? S.ocu[i] / d * 100 : 0; };
+
+function setAmt(id, t){ const e = $(id); if (e) e.textContent = t; }
+function setDelta(id, dv, fmt){
+  const e = $(id); if (!e) return;
+  e.textContent = (dv >= 0 ? "+" : "") + fmt(dv);
+  e.className = "delta " + (dv >= 0 ? "up" : "down");
+}
+function setDeltaPct(id, val, ref){   // importe y % vs forecast
+  const e = $(id); if (!e) return;
+  const dv = val - ref, p = Math.abs(ref) > 0.5 ? dv / Math.abs(ref) * 100 : 0;
+  e.textContent = (dv >= 0 ? "+" : "") + n0(dv) + " · " + (dv >= 0 ? "+" : "") + p.toFixed(1) + "%";
+  e.className = "delta " + (dv >= 0 ? "up" : "down");
+}
+const pp = x => n1(x) + " pp";
+function recompute(){
+  const v = ventas();
+  M.forEach((_,i)=>{
+    setAmt("v27-"+i, n0(v[i]));         setDeltaPct("v27-"+i+"d", v[i], D.v26[i]);
+    setAmt("disp27-"+i, n0(dispM(i)));
+    setDelta("ocu-"+i+"d", S.ocu[i]-D.ocu26[i], n0);
+    setDelta("pct-"+i+"d", pctM(i)-D.pct26[i], pp);
+    setDelta("adr-"+i+"d", S.adr[i]-D.adr26[i], eur);
+  });
+  setAmt("v27-t", n0(sum(v)));   setDeltaPct("v27-td", sum(v), sum(D.v26));
+  setAmt("disp27-t", n0(sum(disp())));
+  setAmt("dias-t", n0(sum(S.dias)));
+  setAmt("ocu-t", n0(sum(S.ocu)));   setDelta("ocu-td", sum(S.ocu)-sum(D.ocu26), n0);
+  setAmt("pct-t", pctS(wpct(S.ocu, disp())));   setDelta("pct-td", wpct(S.ocu,disp())-wpct(D.ocu26,D.disp26), pp);
+  setAmt("adr-t", eur(wadr(v, S.ocu)));   setDelta("adr-td", wadr(v,S.ocu)-wadr(D.v26,D.ocu26), eur);
+}
+
+function parse(s){ return parseFloat(String(s).replace(/\./g,"").replace(",",".")) || 0; }
+
+document.querySelectorAll("input.c").forEach(el => el.addEventListener("input", () => {
+  const k = el.dataset.k, m = +el.dataset.m, val = parse(el.value);
+  if (k === "pct") { S.ocu[m] = val / 100 * dispM(m); setInput("ocu", m, val ? n0(S.ocu[m]) : ""); }
+  else if (k === "ocu") { S.ocu[m] = val; setInput("pct", m, val ? n1(pctM(m)) : ""); }
+  else { S[k][m] = val; if (k === "dias" && S.ocu[m]) setInput("pct", m, n1(pctM(m))); }
+  recompute(); guardarAloj();
+}));
+
+$("incIng").addEventListener("input", e => {         // incremento de ingresos → ADR
+  const inc = 1 + (parseFloat(e.target.value) || 0) / 100;
+  S.adr = D.adr26.map(a => a * inc);
+  S.adr.forEach((a,i)=> setInput("adr", i, n1(a)));
+  recompute(); guardarAloj();
+});
+$("comprimir").addEventListener("click", () => {     // comprime/expande los meses
+  const solo = document.getElementById("t").classList.toggle("solo-anual");
+  $("comprimir").textContent = solo ? "Ver meses" : "Comprimir meses";
+  $("comprimir").classList.toggle("on", solo);
+});
+$("limpiar").addEventListener("click", () => {       // vacía todo menos Días
+  S.ocu.fill(0); S.adr.fill(0);
+  ["ocu","pct","adr"].forEach(k => M.forEach((_,i)=> setInput(k, i, "")));
+  recompute(); guardarAloj();
+});
+
+recompute();
+</script>
+</body>
+</html>

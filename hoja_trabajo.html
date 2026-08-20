@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presupuesto · SB Bahía Málaga</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
+    --neg:#c0392b; --manual:#c8862a; --manual-bg:#fbf3e3;
+    --ing:#157347; --ing-bg:#e8f3ec; --gas:#34618e; --gas-bg:#eaf1f8;
+    --gop:#b9722a; --gop-bg:#f7efe1; --res:#0f766e; --res-bg:#e5f1ef;
+    --mf-bg:#fbf1e0; --mr-bg:#e6eef8; --mp-bg:#e6f2ea; --mform-bg:#efe6f5;
+    --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d;
+      --neg:#ff6b5e; --manual:#e0a566; --manual-bg:#33291a;
+      --ing:#4ac07e; --ing-bg:#15301f; --gas:#6ea8dc; --gas-bg:#152634;
+      --gop:#e0a566; --gop-bg:#312819; --res:#4fd1c5; --res-bg:#14312e;
+      --mf-bg:#312717; --mr-bg:#14202e; --mp-bg:#14291c; --mform-bg:#221830;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    font-feature-settings:"tnum" 1; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:99vw; margin:0 auto; padding:22px 14px 60px; }
+  h1 { font-size:22px; margin:0; }
+  .sub { color:var(--muted); font-size:12.5px; margin:2px 0 12px; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end; margin-bottom:10px; }
+  .ctl { display:flex; flex-direction:column; gap:4px; }
+  .ctl label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  .ctl input, .ctl select { padding:6px 8px; border:1px solid var(--line); border-radius:8px;
+    background:var(--panel); color:var(--ink); font:inherit; }
+  .ctl input[type=number] { width:84px; text-align:right; }
+  .btn { font:inherit; font-size:12.5px; color:var(--muted); background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:7px 12px; cursor:pointer; }
+  .btn:hover { color:var(--ink); border-color:var(--muted); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.on { color:var(--ing); border-color:var(--ing); background:var(--ing-bg); }
+  .btn.nav { color:var(--res); border-color:var(--res); }
+  .savedHint { font-size:11.5px; color:var(--res); align-self:center; transition:opacity .4s; }
+  .sep { width:1px; align-self:stretch; background:var(--line); margin:0 2px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    box-shadow:var(--shadow); overflow:auto; max-height:calc(100vh - 170px); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { padding:4px 9px; border-bottom:1px solid var(--line); white-space:nowrap; text-align:right; }
+  thead th { font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em;
+    font-weight:600; position:sticky; top:0; background:var(--panel); z-index:3; }
+  th.lbl, td.lbl { text-align:left; position:sticky; left:0; background:var(--panel); z-index:2; min-width:220px; }
+  td.num { font-variant-numeric:tabular-nums; }
+  thead th.esc { color:var(--ink); font-weight:700; }
+  .cx { cursor:pointer; user-select:none; margin-right:5px; color:var(--gas); font-weight:700; }
+  td.aR, th.aR { border-left:2px solid var(--line); color:var(--muted); }
+  td.aF, th.aF { border-left:1px solid var(--line); color:var(--muted); }
+  td.aP, th.aP { border-left:2px solid var(--line); font-weight:600; }
+  .vinc { display:flex; flex-wrap:wrap; gap:5px 7px; align-items:center; margin:-2px 0 10px; }
+  .vinc .vlbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  .vinc .chip { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line);
+    background:var(--panel); color:var(--muted); white-space:nowrap; }
+  .vinc .chip.ing { border-color:var(--ing); color:var(--ing); background:var(--ing-bg); }
+  .vinc .chip.gas { border-color:var(--gas); color:var(--gas); background:var(--gas-bg); }
+  td.mcol, th.mcol { border-left:1px solid var(--line); background:var(--bg); }
+  td.mfijo, th.mfijo { background:var(--mf-bg); }
+  td.mratio, th.mratio { background:var(--mr-bg); }
+  td.mpct, th.mpct { background:var(--mp-bg); }
+  td.mform, th.mform { background:var(--mform-bg); }
+  .mR,.mF,.mP { display:none; }
+  table.vR .mR, table.vF .mF, table.vP .mP { display:table-cell; }
+  .delta { display:inline-block; margin-left:5px; font-size:9.5px; }
+  .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
+  tr.detalle { display:none; } tr.detalle.visible { display:table-row; }
+  tr.detalle td.lbl { padding-left:26px; font-weight:400; }
+  tr.grupo { cursor:pointer; } tr.grupo td { font-weight:600; background:rgba(125,140,170,.05); }
+  tr.grupo td.lbl { background:color-mix(in srgb, var(--panel) 93%, var(--muted)); }
+  tr.grupo.open td { background:rgba(125,140,170,.12); }
+  tr.grupo.open td.lbl { background:color-mix(in srgb, var(--panel) 85%, var(--muted)); }
+  tr.grupo:hover td { background:rgba(125,140,170,.14); }
+  #fpick { position:absolute; display:none; z-index:20; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; box-shadow:var(--shadow); max-height:280px; overflow:auto; min-width:210px; padding:4px; }
+  #fpick .fp-h { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; padding:5px 8px; }
+  #fpick .fp-item { padding:5px 9px; font-size:12.5px; cursor:pointer; border-radius:6px; text-align:left; }
+  #fpick .fp-item:hover { background:var(--ing-bg); color:var(--ing); }
+  .caret { display:inline-block; width:11px; color:var(--muted); transition:transform .15s; }
+  tr.grupo.open .caret { transform:rotate(90deg); }
+  input.mi, input.mp { font:inherit; font-size:11.5px; text-align:right; padding:2px 4px;
+    border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+  input.mi { width:64px; } input.mp { width:62px; }
+  input.mp.manual { background:var(--manual-bg); color:var(--manual); font-weight:600; border-color:var(--manual); }
+  .hint { display:block; font-size:9px; color:var(--muted); margin-top:1px; }
+  td.mR, td.mF { color:var(--muted); }
+  input.mi.wide { width:130px; }
+  tr.sec td { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted);
+    font-weight:700; padding-top:11px; border-bottom:none; background:var(--panel); text-align:left; }
+  tr.tI td { font-weight:700; background:var(--ing-bg); } tr.tI td.lbl { color:var(--ing); background:var(--ing-bg); }
+  tr.tG td { font-weight:700; background:var(--gas-bg); } tr.tG td.lbl { color:var(--gas); background:var(--gas-bg); }
+  tr.tP td, tr.tE td { font-weight:700; background:var(--gop-bg); } tr.tP td.lbl, tr.tE td.lbl { color:var(--gop); background:var(--gop-bg); }
+  tr.tR td { font-weight:800; background:var(--res-bg); } tr.tR td.lbl { color:var(--res); background:var(--res-bg); }
+  footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js"></script><script src="shg-cloud.js"></script><script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
+<style>
+  .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
+    flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(20,30,50,.05); }
+  .appbar .ab-home { font:inherit; font-size:12.5px; font-weight:700; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 11px;
+    text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .appbar .ab-home:hover { border-color:var(--gas); color:var(--gas); }
+  .appbar .ab-nav { display:flex; flex-wrap:wrap; gap:5px; }
+  .appbar .ab-nav a { font-size:12px; color:var(--muted); text-decoration:none; border:1px solid transparent;
+    border-radius:7px; padding:5px 9px; white-space:nowrap; }
+  .appbar .ab-nav a:hover { color:var(--ink); border-color:var(--line); }
+  .appbar .ab-nav a.on { color:var(--gas); border-color:var(--gas); background:var(--gas-bg); font-weight:700; }
+  .appbar .ab-sp { flex:1; }
+  .appbar .ab-ver { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px;
+    padding:5px 12px; white-space:nowrap; }
+  .appbar .ab-ver.on { color:var(--res); border-color:var(--res); background:var(--res-bg); font-weight:700; }
+</style>
+<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="on" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
+<script>
+(function(){
+  try {
+    var act = localStorage.getItem("shg_version_activa");
+    var vs = JSON.parse(localStorage.getItem("shg_versiones") || "{}");
+    var el = document.getElementById("abVer");
+    if (act && vs[act]) {
+      el.textContent = "Versión: " + vs[act].nombre + " · " + vs[act].anio;
+      el.classList.add("on");
+    } else {
+      el.textContent = "Sin versión activa";
+    }
+  } catch (e) {}
+})();
+</script>
+
+  <div class="wrap">
+    <h1>Presupuesto · <span id="tit">SB Bahía Málaga</span></h1>
+    <div class="sub">Consultora Hotelera, SL · 44 habitaciones · Presupuesto 2027 · métodos aditivos: Fijo (mensual) + Ratio·ocupación + %·ventas + Fórmula; vacío = incremento sobre forecast</div>
+    <div class="controls">
+      <div class="ctl"><label>Hotel (trabajando)</label><select id="selHotel"></select></div>
+      <button class="btn" id="toggleAll">Desplegar partidas</button>
+      <span id="savedHint" class="savedHint"></span>
+      <div class="ctl" style="margin-left:auto"><label>Referencia de medidas</label><select id="refBase"><option value="fc">Forecast</option><option value="prev">Año anterior</option></select></div>
+      <div class="ctl"><label>Clonar medidas de otro hotel</label>
+        <div style="display:flex; gap:6px"><select id="cloneHotel"></select><button class="btn" id="cloneBtn" disabled>Clonar</button></div></div>
+    </div>
+    <div class="vinc" id="vinc"></div>
+    <div class="card"><table id="t"><thead><tr id="cab"></tr></thead><tbody id="cuerpo"></tbody></table></div>
+    <footer>App de Presupuestos SHG · el alojamiento y el personal se calculan en sus páginas · edita un mes del Ppto para fijarlo manualmente</footer>
+  </div>
+  <div id="fpick"></div>
+<script>
+const D = {"hotel": "SB Bahía Málaga", "idHotel": 4, "hoteles": [{"id": 23, "nombre": "AT Museo"}, {"id": 67, "nombre": "Bahía Malaga S.L."}, {"id": 44, "nombre": "CENTRAL ESPAÑA"}, {"id": 104, "nombre": "Computatrum"}, {"id": 57, "nombre": "Córdoba Colón"}, {"id": 101, "nombre": "El Arenal"}, {"id": 59, "nombre": "FACILITIES"}, {"id": 73, "nombre": "Gestor Hotelero Urbano"}, {"id": 66, "nombre": "Hitaca Hotels & Resorts"}, {"id": 53, "nombre": "Hoy no me puedo levantar"}, {"id": 97, "nombre": "ITC Aptos Córdoba"}, {"id": 56, "nombre": "ITC Artemisa"}, {"id": 64, "nombre": "ITC Barcelona"}, {"id": 81, "nombre": "ITC Ciudad de Haro"}, {"id": 90, "nombre": "ITC Cádiz"}, {"id": 75, "nombre": "ITC Infantas"}, {"id": 54, "nombre": "ITC Jerez"}, {"id": 77, "nombre": "ITC Madrid"}, {"id": 61, "nombre": "ITC Madrid Alcalá Norte"}, {"id": 18, "nombre": "ITC Salamanca"}, {"id": 55, "nombre": "ITC Sevilla"}, {"id": 65, "nombre": "MD Almerimar"}, {"id": 80, "nombre": "MD Portomagno"}, {"id": 69, "nombre": "MD Puerto"}, {"id": 68, "nombre": "Maral Hostelera, SL"}, {"id": 103, "nombre": "OH Balear"}, {"id": 102, "nombre": "Residencia La15 Palmera"}, {"id": 100, "nombre": "Residencia la15 Triana"}, {"id": 96, "nombre": "SB Academy"}, {"id": 4, "nombre": "SB Bahía Málaga"}, {"id": 17, "nombre": "SB Capuchinos"}, {"id": 34, "nombre": "SB Castillo de Santa Catalina"}, {"id": 38, "nombre": "SB Columela"}, {"id": 19, "nombre": "SB Congreso"}, {"id": 93, "nombre": "SB Duques de Medinaceli"}, {"id": 95, "nombre": "SB Gran Vía 76"}, {"id": 87, "nombre": "SB Granada"}, {"id": 5, "nombre": "SB Jerez"}, {"id": 99, "nombre": "SB La Victoria"}, {"id": 2, "nombre": "SB Los Naranjos"}, {"id": 91, "nombre": "SB Murcia"}, {"id": 3, "nombre": "SB Málaga"}, {"id": 15, "nombre": "SB Oviedo"}, {"id": 20, "nombre": "SB Palacio S. Gabriel"}, {"id": 52, "nombre": "SB Palacio de Pombo"}, {"id": 37, "nombre": "SB Palillero"}, {"id": 9, "nombre": "SB Salamanca"}, {"id": 92, "nombre": "SB Sardinero"}, {"id": 33, "nombre": "SB Urban"}, {"id": 7, "nombre": "SB Vistahermosa (44 AT)"}, {"id": 71, "nombre": "SB la Harinera"}, {"id": 98, "nombre": "Urania Cádiz"}], "anioObjetivo": 2027, "anioAnt": 2025, "anioAct": 2026, "grupos": [{"nombre": "Alojamiento", "ingreso": true, "seccion": "ing", "esAlojamiento": true, "detalle": [{"nombre": "Ventas de Alojamiento", "prev": 1859231.99, "fc": 2016313.21, "prevMes": [109861.49, 114146.1, 145557.77, 173640.41, 184865.92, 158657.96, 154030.58, 181239.68, 184392.73, 180483.65, 132349.28, 140006.42], "fcMes": [107030.84, 118554.32, 158745.94, 186710.64, 201547.17, 171949.86, 171774.44, 185000.0, 195000.0, 200000.0, 155000.0, 165000.0], "driver": "total", "refPrev": {"fijo": 154936.0, "ratio": 126.289, "pct": 86.274}, "refFc": {"fijo": 168026.1, "ratio": 134.672, "pct": 87.64}}], "catClave": "alojamiento"}, {"nombre": "F&B", "ingreso": true, "seccion": "ing", "esAlojamiento": false, "detalle": [{"nombre": "TOTAL VENTAS DE COMIDA Y BEBIDA", "prev": 247520.29, "fc": 232463.18, "prevMes": [14923.02, 20109.52, 20413.45, 26269.87, 23910.56, 20657.93, 20406.2, 21022.24, 20825.32, 21873.37, 20345.78, 16763.03], "fcMes": [14221.18, 16197.83, 17261.59, 21817.15, 21267.83, 15792.56, 18405.04, 22500.0, 22500.0, 22500.0, 20000.0, 20000.0], "driver": "total", "refPrev": {"fijo": 20626.69, "ratio": 16.813, "pct": 11.486}, "refFc": {"fijo": 19371.93, "ratio": 15.527, "pct": 10.104}}, {"nombre": "TOTAL OTROS INGRESOS F&B", "prev": 57.85, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 57.85, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 4.82, "ratio": 0.004, "pct": 0.003}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}], "catClave": "fb"}, {"nombre": "Varios", "ingreso": true, "seccion": "ing", "esAlojamiento": false, "detalle": [{"nombre": "Cajas de seguridad", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Servicios de transfers", "prev": 1450.77, "fc": 611.77, "prevMes": [163.62, 109.08, 211.8, 90.9, 184.53, 72.72, 81.81, 81.81, 127.26, 81.81, 145.44, 99.99], "fcMes": [109.08, 99.99, 72.72, 209.07, 27.27, 93.64, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 120.9, "ratio": 0.099, "pct": 0.067}, "refFc": {"fijo": 50.98, "ratio": 0.041, "pct": 0.027}}, {"nombre": "Excursiones", "prev": 466.94, "fc": 520.66, "prevMes": [107.44, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 61.98, 0.0, 0.0, 0.0, 297.52], "fcMes": [0.0, 0.0, 123.97, 0.0, 396.69, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 38.91, "ratio": 0.032, "pct": 0.022}, "refFc": {"fijo": 43.39, "ratio": 0.035, "pct": 0.023}}, {"nombre": "Lavandería y tintorería", "prev": 336.99, "fc": 197.46, "prevMes": [0.0, 28.64, 10.91, 0.0, 45.45, 0.0, 135.27, 50.18, 0.0, 53.45, 13.09, 0.0], "fcMes": [0.0, 0.0, 0.0, 13.09, 105.82, 78.55, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 28.08, "ratio": 0.023, "pct": 0.016}, "refFc": {"fijo": 16.45, "ratio": 0.013, "pct": 0.009}}, {"nombre": "Máquinas expendedora", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Parking", "prev": 7496.44, "fc": 9067.22, "prevMes": [965.44, 507.27, 490.87, 310.89, 278.16, 179.99, 261.81, 474.52, 425.44, 523.62, 1229.35, 1849.08], "fcMes": [1989.09, 1456.35, 1187.27, 932.71, 1227.27, 1112.72, 1161.81, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 624.7, "ratio": 0.509, "pct": 0.348}, "refFc": {"fijo": 755.6, "ratio": 0.606, "pct": 0.394}}, {"nombre": "SPA Circuito", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "SPA Tratamientos y masajes", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "SPA Venta de productos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Piscina", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Telecomunicaciones", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Clientes no show", "prev": 26568.17, "fc": 34510.29, "prevMes": [455.36, 961.59, 2353.12, 2292.26, 1156.39, 1499.22, 754.83, 1875.93, 1608.36, 11859.8, 536.35, 1214.96], "fcMes": [425.63, 2052.04, 1268.6, 1988.07, 5871.13, 1221.93, 1481.89, 4065.0, 4000.0, 4000.0, 4037.0, 4099.0], "driver": "total", "refPrev": {"fijo": 2214.01, "ratio": 1.805, "pct": 1.233}, "refFc": {"fijo": 2875.86, "ratio": 2.305, "pct": 1.5}}, {"nombre": "Cancelación de reservas", "prev": 10036.19, "fc": 6136.98, "prevMes": [134.1, 246.6, 5648.15, -4072.2, 464.0, 1382.0, 469.84, 0.0, 569.2, 1761.8, 2652.0, 780.7], "fcMes": [242.1, 726.5, 996.2, 1326.81, 1391.6, 215.67, 1238.1, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 836.35, "ratio": 0.682, "pct": 0.466}, "refFc": {"fijo": 511.41, "ratio": 0.41, "pct": 0.267}}, {"nombre": "Otros ingresos", "prev": 1869.19, "fc": 858.26, "prevMes": [172.71, 102.73, 29.09, 153.64, 33.64, 270.92, 209.11, 208.2, 94.55, 200.02, 189.11, 205.47], "fcMes": [85.46, 44.55, 133.65, 204.56, 100.01, 78.19, 211.84, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 155.77, "ratio": 0.127, "pct": 0.087}, "refFc": {"fijo": 71.52, "ratio": 0.057, "pct": 0.037}}], "catClave": "varios"}, {"nombre": "MF y otros servicios", "ingreso": true, "seccion": "ing", "esAlojamiento": false, "detalle": [], "catClave": "mf_ing"}, {"nombre": "Personal", "ingreso": false, "seccion": "dir", "esAlojamiento": false, "detalle": [{"nombre": "Sueldos y salarios", "prev": 365839.11, "fc": 355176.28, "prevMes": [25385.66, 26563.0, 27107.43, 32208.53, 31983.42, 34757.58, 32443.81, 33279.74, 34714.85, 29828.51, 27260.73, 30305.85], "fcMes": [28917.44, 28432.02, 28080.84, 31607.5, 34384.78, 39714.3, 38851.74, 25126.14, 25126.14, 25126.14, 25126.14, 24683.1], "driver": "total", "refPrev": {"fijo": 30486.59, "ratio": 24.85, "pct": 16.976}, "refFc": {"fijo": 29598.02, "ratio": 23.723, "pct": 15.438}}, {"nombre": "Externalización de servicios", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Seguros sociales", "prev": 83668.65, "fc": 117050.25, "prevMes": [5038.98, 6875.08, 7523.28, 7255.26, 6291.53, 7593.93, 7051.2, 7582.29, 8009.56, 7024.62, 7802.36, 5620.56], "fcMes": [4713.23, 6687.39, 5586.22, 6273.08, 7657.45, 9761.76, 8962.38, 13529.46, 13529.46, 13529.46, 13529.46, 13290.9], "driver": "total", "refPrev": {"fijo": 6972.39, "ratio": 5.683, "pct": 3.882}, "refFc": {"fijo": 9754.19, "ratio": 7.818, "pct": 5.088}}, {"nombre": "Manutención", "prev": 0.0, "fc": 27.77, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 27.77, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 2.31, "ratio": 0.002, "pct": 0.001}}, {"nombre": "Seguros médicos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Mutua profesional", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Bonos e incentivos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Uniformes", "prev": 1052.85, "fc": 1353.61, "prevMes": [0.0, 0.0, 173.31, 296.99, 0.0, 164.88, 106.09, 227.99, 0.0, 0.0, 0.0, 83.59], "fcMes": [51.77, 0.0, 332.79, 57.29, 23.85, 0.0, 137.91, 150.0, 150.0, 150.0, 150.0, 150.0], "driver": "total", "refPrev": {"fijo": 87.74, "ratio": 0.072, "pct": 0.049}, "refFc": {"fijo": 112.8, "ratio": 0.09, "pct": 0.059}}, {"nombre": "Formación", "prev": 871.05, "fc": 350.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 420.0, 0.0, 0.0, 0.0, 420.0, 31.05, 0.0, 0.0], "fcMes": [0.0, -420.0, 0.0, 0.0, 0.0, 0.0, 420.0, 70.0, 70.0, 70.0, 70.0, 70.0], "driver": "total", "refPrev": {"fijo": 72.59, "ratio": 0.059, "pct": 0.04}, "refFc": {"fijo": 29.17, "ratio": 0.023, "pct": 0.015}}, {"nombre": "Cestas navidad y eventos para el personal", "prev": 0.0, "fc": 439.82, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 439.82, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 36.65, "ratio": 0.029, "pct": 0.019}}, {"nombre": "Otros gastos sociales", "prev": 867.12, "fc": 5234.16, "prevMes": [394.02, 32.61, 32.61, 32.61, 32.61, 32.61, 147.0, 32.61, 32.61, 32.61, 32.61, 32.61], "fcMes": [33.46, 33.45, 33.45, 33.45, 33.45, 33.45, 33.45, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0], "driver": "total", "refPrev": {"fijo": 72.26, "ratio": 0.059, "pct": 0.04}, "refFc": {"fijo": 436.18, "ratio": 0.35, "pct": 0.228}}], "catClave": "personal"}, {"nombre": "Gastos Alojamiento", "ingreso": false, "seccion": "dir", "esAlojamiento": false, "detalle": [{"nombre": "Alquiler cajas fuertes", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Alquiler minibares", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Alquiler TV´s", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Amenities y productos de clientes", "prev": 13459.82, "fc": 12650.8, "prevMes": [955.54, 1286.36, 667.28, 2175.3, 1970.8, 964.95, 1008.69, 899.99, 1086.91, 472.8, 875.47, 1095.73], "fcMes": [674.78, 1139.04, 888.66, 760.57, 1536.72, 1267.51, 623.52, 1170.0, 1125.0, 1170.0, 1125.0, 1170.0], "driver": "total", "refPrev": {"fijo": 1121.65, "ratio": 0.914, "pct": 0.625}, "refFc": {"fijo": 1054.23, "ratio": 0.845, "pct": 0.55}}, {"nombre": "Comisiones de agencias", "prev": 268324.32, "fc": 280893.68, "prevMes": [21585.97, 17562.97, 21721.31, 24314.94, 22416.65, 20825.98, 22167.23, 30304.77, 26623.61, 21592.56, 19492.15, 19716.18], "fcMes": [19032.24, 14970.7, 22431.87, 23641.55, 20976.11, 25602.97, 26438.24, 26270.0, 27690.0, 28400.0, 22010.0, 23430.0], "driver": "aloj", "refPrev": {"fijo": 22360.36, "ratio": 18.226, "pct": 14.432}, "refFc": {"fijo": 23407.81, "ratio": 18.761, "pct": 13.931}}, {"nombre": "Decoración y flores", "prev": 512.65, "fc": 110.0, "prevMes": [0.0, 0.0, 0.0, 100.95, 0.0, 0.0, 0.0, 0.0, 0.0, 409.0, 2.7, 0.0], "fcMes": [0.0, 0.0, 60.0, 0.0, 0.0, 0.0, 0.0, 10.0, 10.0, 10.0, 10.0, 10.0], "driver": "total", "refPrev": {"fijo": 42.72, "ratio": 0.035, "pct": 0.024}, "refFc": {"fijo": 9.17, "ratio": 0.007, "pct": 0.005}}, {"nombre": "Desinfección y desratización", "prev": 2862.11, "fc": 3521.23, "prevMes": [0.0, 263.98, 567.52, 47.46, 47.46, 567.52, 359.07, 47.46, 567.52, 47.46, 0.0, 346.66], "fcMes": [47.46, 47.46, 667.11, 47.46, 47.46, 1048.46, 365.82, 250.0, 250.0, 250.0, 250.0, 250.0], "driver": "total", "refPrev": {"fijo": 238.51, "ratio": 0.194, "pct": 0.133}, "refFc": {"fijo": 293.44, "ratio": 0.235, "pct": 0.153}}, {"nombre": "Dotaciones habitaciones", "prev": 851.95, "fc": 2132.76, "prevMes": [0.0, 0.0, 10.0, 240.5, 0.0, 0.0, 0.0, 0.0, 426.43, -52.68, 178.2, 49.5], "fcMes": [0.0, 240.5, 707.06, 450.0, 118.9, 141.3, 0.0, 95.0, 95.0, 95.0, 95.0, 95.0], "driver": "total", "refPrev": {"fijo": 71.0, "ratio": 0.058, "pct": 0.04}, "refFc": {"fijo": 177.73, "ratio": 0.142, "pct": 0.093}}, {"nombre": "Empresa Trabajo Temporal", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "TV interactiva", "prev": 1815.0, "fc": 2005.0, "prevMes": [0.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0], "fcMes": [165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 165.0, 170.0, 170.0, 170.0, 170.0, 170.0], "driver": "total", "refPrev": {"fijo": 151.25, "ratio": 0.123, "pct": 0.084}, "refFc": {"fijo": 167.08, "ratio": 0.134, "pct": 0.087}}, {"nombre": "Hilo musical", "prev": 192.0, "fc": 205.36, "prevMes": [16.0, 16.0, 16.0, 16.0, 16.0, 16.0, 16.0, 16.0, 16.0, 16.0, 16.0, 16.0], "fcMes": [16.48, 16.48, 16.48, 16.48, 16.48, 16.48, 16.48, 18.0, 18.0, 18.0, 18.0, 18.0], "driver": "total", "refPrev": {"fijo": 16.0, "ratio": 0.013, "pct": 0.009}, "refFc": {"fijo": 17.11, "ratio": 0.014, "pct": 0.009}}, {"nombre": "Lavandería", "prev": 56238.73, "fc": 61712.11, "prevMes": [5243.14, 4077.61, 4178.24, 5005.14, 5240.65, 4038.31, 4189.39, 4814.3, 5179.13, 5041.92, 4609.29, 4621.61], "fcMes": [5178.3, 5024.45, 5473.37, 5722.53, 5469.87, 5020.89, 4862.7, 5070.0, 4875.0, 5070.0, 4875.0, 5070.0], "driver": "total", "refPrev": {"fijo": 4686.56, "ratio": 3.82, "pct": 2.61}, "refFc": {"fijo": 5142.68, "ratio": 4.122, "pct": 2.682}}, {"nombre": "Overbooking", "prev": 8122.2, "fc": 7110.11, "prevMes": [674.18, 301.82, 2136.48, 1191.27, 694.76, 941.82, 0.0, 1333.22, 489.8, 162.73, 196.12, 0.0], "fcMes": [1512.0, 408.27, 222.73, 1770.42, 3196.69, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 676.85, "ratio": 0.552, "pct": 0.377}, "refFc": {"fijo": 592.51, "ratio": 0.475, "pct": 0.309}}, {"nombre": "Prensa clientes", "prev": 16.62, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16.62, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 1.39, "ratio": 0.001, "pct": 0.001}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Productos de limpieza", "prev": 6002.58, "fc": 6649.93, "prevMes": [370.6, 295.28, 604.02, 544.96, 604.62, 609.17, 453.34, 558.79, 570.27, 556.64, 402.4, 432.49], "fcMes": [540.93, 456.09, 406.03, 1001.73, 814.56, 571.57, 299.02, 520.0, 500.0, 520.0, 500.0, 520.0], "driver": "total", "refPrev": {"fijo": 500.21, "ratio": 0.408, "pct": 0.279}, "refFc": {"fijo": 554.16, "ratio": 0.444, "pct": 0.289}}, {"nombre": "Sociedad General de Autores", "prev": 643.64, "fc": 761.15, "prevMes": [87.97, 73.11, 0.0, 161.08, 0.0, 0.0, 161.08, 0.0, 0.0, 160.4, 0.0, 0.0], "fcMes": [88.7, 0.0, 73.35, 162.05, 0.0, 0.0, 162.05, 55.0, 55.0, 55.0, 55.0, 55.0], "driver": "total", "refPrev": {"fijo": 53.64, "ratio": 0.044, "pct": 0.03}, "refFc": {"fijo": 63.43, "ratio": 0.051, "pct": 0.033}}, {"nombre": "Otros gastos varios", "prev": 1380.0, "fc": 2489.25, "prevMes": [45.0, 45.0, 45.0, 45.0, 0.0, 90.0, 45.0, 45.0, 195.0, 435.0, 195.0, 195.0], "fcMes": [0.0, 204.75, 204.75, 204.75, 204.75, 409.5, 684.75, 117.0, 112.5, 117.0, 112.5, 117.0], "driver": "total", "refPrev": {"fijo": 115.0, "ratio": 0.094, "pct": 0.064}, "refFc": {"fijo": 207.44, "ratio": 0.166, "pct": 0.108}}], "catClave": "g_alojamiento"}, {"nombre": "Consumos F&B", "ingreso": false, "seccion": "dir", "esAlojamiento": false, "detalle": [{"nombre": "Compras de comida", "prev": 73385.36, "fc": 71803.86, "prevMes": [5141.94, 5131.13, 5648.63, 8063.51, 6787.98, 6951.48, 5489.59, 6458.07, 5637.74, 7355.46, 5305.35, 5414.48], "fcMes": [4725.68, 5153.64, 6244.85, 6728.67, 6372.53, 5758.86, 4953.34, 6669.69, 6669.69, 6669.69, 5928.61, 5928.61], "driver": "fb", "refPrev": {"fijo": 6115.45, "ratio": 4.985, "pct": 29.641}, "refFc": {"fijo": 5983.65, "ratio": 4.796, "pct": 30.888}}, {"nombre": "Variación de existencias comida", "prev": 1171.09, "fc": -210.64, "prevMes": [784.51, 361.31, 898.02, -922.67, 432.65, -734.49, 228.42, 169.05, 78.93, -623.3, 675.62, -176.96], "fcMes": [-465.51, 326.03, -870.38, 375.56, -158.0, -496.58, 575.64, 100.52, 100.52, 100.52, 100.52, 100.52], "driver": "fb", "refPrev": {"fijo": 97.59, "ratio": 0.08, "pct": 0.473}, "refFc": {"fijo": -17.55, "ratio": -0.014, "pct": -0.091}}, {"nombre": "Deducciones manutención personal", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "fb", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Deducciones atenciones habitaciones", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "fb", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Deducciones invitaciones", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "fb", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Otros ingresos comida", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "fb", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}], "catClave": "consumos_fb"}, {"nombre": "Gastos F&B", "ingreso": false, "seccion": "dir", "esAlojamiento": false, "detalle": [{"nombre": "Alquiler Audiovisuales", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "APPCC", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Comisiones", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Compras para eventos y banquetes", "prev": 341.0, "fc": 250.0, "prevMes": [0.0, 0.0, 0.0, 111.0, 0.0, 0.0, 0.0, 230.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0, 50.0, 50.0, 50.0, 50.0], "driver": "total", "refPrev": {"fijo": 28.42, "ratio": 0.023, "pct": 0.016}, "refFc": {"fijo": 20.83, "ratio": 0.017, "pct": 0.011}}, {"nombre": "Cuberteria", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Empresas Trabajo Temporal", "prev": 0.0, "fc": 2558.02, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [952.8, 0.0, 0.0, 0.0, 0.0, 0.0, 1605.22, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 213.17, "ratio": 0.171, "pct": 0.111}}, {"nombre": "Floristeria", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Lavanderia F&B", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Menaje", "prev": 1425.28, "fc": 1651.58, "prevMes": [108.26, 0.0, 0.0, 44.8, 540.76, 266.82, 38.63, 57.76, 62.07, 0.0, 306.18, 0.0], "fcMes": [24.25, 0.0, 114.86, 136.89, 198.56, 40.1, 136.92, 200.0, 200.0, 200.0, 200.0, 200.0], "driver": "total", "refPrev": {"fijo": 118.77, "ratio": 0.097, "pct": 0.066}, "refFc": {"fijo": 137.63, "ratio": 0.11, "pct": 0.072}}, {"nombre": "Menús y cartas", "prev": 0.0, "fc": 50.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 10.0, 10.0, 10.0, 10.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 4.17, "ratio": 0.003, "pct": 0.002}}, {"nombre": "Personal extra", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Productos consumo clientes", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Sociedad General Autores", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Vajilla", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Otros gastos varios F&B", "prev": 1313.97, "fc": 1571.21, "prevMes": [187.4, 34.12, 52.29, 256.88, 67.81, 97.27, 204.66, 115.84, 49.9, 165.82, 27.02, 54.96], "fcMes": [93.89, 48.0, 76.27, 93.87, 199.41, 53.5, 131.27, 175.0, 175.0, 175.0, 175.0, 175.0], "driver": "total", "refPrev": {"fijo": 109.5, "ratio": 0.089, "pct": 0.061}, "refFc": {"fijo": 130.93, "ratio": 0.105, "pct": 0.068}}], "catClave": "g_fb"}, {"nombre": "Otros departamentos", "ingreso": false, "seccion": "dir", "esAlojamiento": false, "detalle": [{"nombre": "Excursiones de clientes", "prev": 373.56, "fc": 516.52, "prevMes": [85.95, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 49.59, 0.0, 0.0, 0.0, 238.02], "fcMes": [0.0, 0.0, 99.17, 0.0, 317.35, 0.0, 0.0, 20.0, 20.0, 20.0, 20.0, 20.0], "driver": "total", "refPrev": {"fijo": 31.13, "ratio": 0.025, "pct": 0.017}, "refFc": {"fijo": 43.04, "ratio": 0.034, "pct": 0.022}}, {"nombre": "Coste artículos vendidos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Coste productos SPA", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Gastos Parking", "prev": 12360.0, "fc": 13733.7, "prevMes": [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1330.0, 1030.0], "fcMes": [1060.9, 1060.9, 1060.9, 1060.9, 1060.9, 1060.9, 1068.3, 1260.0, 1260.0, 1260.0, 1260.0, 1260.0], "driver": "total", "refPrev": {"fijo": 1030.0, "ratio": 0.84, "pct": 0.574}, "refFc": {"fijo": 1144.48, "ratio": 0.917, "pct": 0.597}}, {"nombre": "Lavandería y tintorería para clientes", "prev": 255.93, "fc": 242.28, "prevMes": [0.0, 24.3, 26.41, 0.0, 30.17, 0.0, 87.73, 35.62, 0.0, 42.69, 9.01, 0.0], "fcMes": [0.0, 0.0, 0.0, 9.01, 73.89, 59.38, 0.0, 20.0, 20.0, 20.0, 20.0, 20.0], "driver": "total", "refPrev": {"fijo": 21.33, "ratio": 0.017, "pct": 0.012}, "refFc": {"fijo": 20.19, "ratio": 0.016, "pct": 0.011}}, {"nombre": "Lavandería SPA", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Masajistas", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Parking", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "TV interactiva", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Trasporte de clientes", "prev": 231.81, "fc": 200.45, "prevMes": [0.0, 39.09, 0.0, 0.0, 117.27, 75.45, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 75.45, 0.0, 25.0, 25.0, 25.0, 25.0, 25.0], "driver": "total", "refPrev": {"fijo": 19.32, "ratio": 0.016, "pct": 0.011}, "refFc": {"fijo": 16.7, "ratio": 0.013, "pct": 0.009}}, {"nombre": "Otros gastos SPA", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Otros gastos varios", "prev": 0.0, "fc": 250.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 50.0, 50.0, 50.0, 50.0, 50.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 20.83, "ratio": 0.017, "pct": 0.011}}], "catClave": "otros_dptos"}, {"nombre": "Administración & Generales", "ingreso": false, "seccion": "ind", "esAlojamiento": false, "detalle": [{"nombre": "Asesorías", "prev": 55.05, "fc": 80.34, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 55.05, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 56.69, 4.73, 4.73, 4.73, 4.73, 4.73], "driver": "total", "refPrev": {"fijo": 4.59, "ratio": 0.004, "pct": 0.003}, "refFc": {"fijo": 6.7, "ratio": 0.005, "pct": 0.003}}, {"nombre": "Comisiones de tarjetas de crédito", "prev": 7447.46, "fc": 7686.69, "prevMes": [22.22, 720.43, 540.78, 564.83, 671.86, 811.99, 692.14, 645.94, 558.95, 735.48, 752.73, 730.11], "fcMes": [579.7, 699.36, 440.5, 837.02, 655.61, 754.98, 636.42, 634.69, 664.5, 679.5, 537.11, 567.3], "driver": "total", "refPrev": {"fijo": 620.62, "ratio": 0.506, "pct": 0.346}, "refFc": {"fijo": 640.56, "ratio": 0.513, "pct": 0.334}}, {"nombre": "Confección de nóminas", "prev": 3462.0, "fc": 2995.0, "prevMes": [226.0, 272.0, 258.0, 322.0, 218.0, 309.0, 303.0, 309.0, 296.0, 369.0, 309.0, 271.0], "fcMes": [50.0, 218.0, 231.0, 244.0, 277.0, 244.0, 231.0, 300.0, 300.0, 300.0, 300.0, 300.0], "driver": "total", "refPrev": {"fijo": 288.5, "ratio": 0.235, "pct": 0.161}, "refFc": {"fijo": 249.58, "ratio": 0.2, "pct": 0.13}}, {"nombre": "Correos y envíos", "prev": 44.87, "fc": 59.77, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 11.16, 0.0, 33.71, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 6.22, 0.0, 28.55, 0.0, 0.0, 5.0, 5.0, 5.0, 5.0, 5.0], "driver": "total", "refPrev": {"fijo": 3.74, "ratio": 0.003, "pct": 0.002}, "refFc": {"fijo": 4.98, "ratio": 0.004, "pct": 0.003}}, {"nombre": "Empresas de seguridad", "prev": 105.06, "fc": 142.32, "prevMes": [12.92, 6.42, 5.86, 6.04, 6.21, 12.53, 4.49, 12.36, 9.84, 12.63, 8.99, 6.77], "fcMes": [21.51, 6.08, 13.29, 21.39, 13.8, 10.72, 5.53, 10.0, 10.0, 10.0, 10.0, 10.0], "driver": "total", "refPrev": {"fijo": 8.76, "ratio": 0.007, "pct": 0.005}, "refFc": {"fijo": 11.86, "ratio": 0.01, "pct": 0.006}}, {"nombre": "Gastos bancarios", "prev": 2075.32, "fc": 939.73, "prevMes": [18.92, 88.4, 20.98, -26.35, 60.98, 47.17, 1770.25, 52.92, 37.36, 12.0, 12.0, -19.31], "fcMes": [28.64, 78.21, 18.96, 14.32, -14.35, 37.12, 26.83, 150.0, 150.0, 150.0, 150.0, 150.0], "driver": "total", "refPrev": {"fijo": 172.94, "ratio": 0.141, "pct": 0.096}, "refFc": {"fijo": 78.31, "ratio": 0.063, "pct": 0.041}}, {"nombre": "Gastos de viaje", "prev": 368.34, "fc": 636.07, "prevMes": [0.0, 8.01, 0.0, 41.32, 0.0, 0.0, 94.97, 73.94, 55.7, 28.93, 65.47, 0.0], "fcMes": [53.0, 54.9, 0.0, 111.09, 101.41, 61.29, 129.38, 25.0, 25.0, 25.0, 25.0, 25.0], "driver": "total", "refPrev": {"fijo": 30.69, "ratio": 0.025, "pct": 0.017}, "refFc": {"fijo": 53.01, "ratio": 0.042, "pct": 0.028}}, {"nombre": "Material de oficina", "prev": 5105.36, "fc": 4954.7, "prevMes": [352.32, 259.81, 951.96, 274.39, 495.7, 426.95, 465.77, 550.61, 279.83, 262.62, 440.39, 345.01], "fcMes": [285.74, 354.38, 391.24, 320.08, 621.5, 180.48, 241.28, 520.0, 500.0, 520.0, 500.0, 520.0], "driver": "total", "refPrev": {"fijo": 425.45, "ratio": 0.347, "pct": 0.237}, "refFc": {"fijo": 412.89, "ratio": 0.331, "pct": 0.215}}, {"nombre": "Notarías y registro", "prev": 71.86, "fc": 50.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 71.86, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 10.0, 10.0, 10.0, 10.0], "driver": "total", "refPrev": {"fijo": 5.99, "ratio": 0.005, "pct": 0.003}, "refFc": {"fijo": 4.17, "ratio": 0.003, "pct": 0.002}}, {"nombre": "Salud en el trabajo", "prev": 1104.18, "fc": 1570.96, "prevMes": [0.0, 0.0, 636.58, 0.0, 0.0, 0.0, 844.0, -376.4, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 870.96, 0.0, 140.0, 140.0, 140.0, 140.0, 140.0], "driver": "total", "refPrev": {"fijo": 92.02, "ratio": 0.075, "pct": 0.051}, "refFc": {"fijo": 130.91, "ratio": 0.105, "pct": 0.068}}, {"nombre": "Seguros", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Servicios de CENTRAL", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Servicios de profesionales independientes", "prev": 470.0, "fc": 425.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 470.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 85.0, 85.0, 85.0, 85.0, 85.0], "driver": "total", "refPrev": {"fijo": 39.17, "ratio": 0.032, "pct": 0.022}, "refFc": {"fijo": 35.42, "ratio": 0.028, "pct": 0.018}}, {"nombre": "Otros gastos administración y grales", "prev": 522.82, "fc": 466.53, "prevMes": [6.54, 5.45, 15.26, 5.45, 13.08, 11.99, 46.63, 8.72, 14.17, 17.44, 15.26, 362.83], "fcMes": [16.35, 19.62, 20.71, 17.44, 22.89, 19.62, 49.9, 60.0, 60.0, 60.0, 60.0, 60.0], "driver": "total", "refPrev": {"fijo": 43.57, "ratio": 0.036, "pct": 0.024}, "refFc": {"fijo": 38.88, "ratio": 0.031, "pct": 0.02}}], "catClave": "ayg"}, {"nombre": "Sistemas", "ingreso": false, "seccion": "ind", "esAlojamiento": false, "detalle": [{"nombre": "Compra material informático", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Coste centralita", "prev": 1395.38, "fc": 575.0, "prevMes": [110.0, 110.0, 110.0, 110.0, 110.0, 110.0, 110.0, 110.0, 110.0, 0.0, 110.0, 295.38], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 115.0, 115.0, 115.0, 115.0, 115.0], "driver": "total", "refPrev": {"fijo": 116.28, "ratio": 0.095, "pct": 0.065}, "refFc": {"fijo": 47.92, "ratio": 0.038, "pct": 0.025}}, {"nombre": "Equipos informáticos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Mantenimientos informáticos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Servicio WIFI Clientes", "prev": 110.0, "fc": 647.2, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 110.0, 0.0, 0.0], "fcMes": [0.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 9.44, 9.44, 9.44, 9.44, 9.44], "driver": "total", "refPrev": {"fijo": 9.17, "ratio": 0.007, "pct": 0.005}, "refFc": {"fijo": 53.93, "ratio": 0.043, "pct": 0.028}}, {"nombre": "Servicios de CENTRAL", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Telefonia fija y móvl", "prev": 2786.06, "fc": 2722.75, "prevMes": [390.59, 224.49, 235.42, 237.54, 231.3, 209.3, 209.3, 210.26, 209.96, 209.3, 209.3, 209.3], "fcMes": [209.61, 310.41, 200.96, 200.38, 200.63, 200.38, 200.38, 240.0, 240.0, 240.0, 240.0, 240.0], "driver": "total", "refPrev": {"fijo": 232.17, "ratio": 0.189, "pct": 0.129}, "refFc": {"fijo": 226.9, "ratio": 0.182, "pct": 0.118}}, {"nombre": "Gastos de sistemas (programas)", "prev": 957.68, "fc": 861.91, "prevMes": [184.17, 0.0, 0.0, 0.0, 184.17, 0.0, 184.17, 0.0, 0.0, 405.17, 0.0, 0.0], "fcMes": [0.0, 215.97, 0.0, 179.97, 36.0, 0.0, 179.97, 50.0, 50.0, 50.0, 50.0, 50.0], "driver": "total", "refPrev": {"fijo": 79.81, "ratio": 0.065, "pct": 0.044}, "refFc": {"fijo": 71.83, "ratio": 0.058, "pct": 0.037}}, {"nombre": "Gestión y almacenamientos de datos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Otros gastos de ICT", "prev": 0.0, "fc": 198.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [73.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 25.0, 25.0, 25.0, 25.0, 25.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 16.5, "ratio": 0.013, "pct": 0.009}}], "catClave": "sistemas"}, {"nombre": "Comercial & Marketing", "ingreso": false, "seccion": "ind", "esAlojamiento": false, "detalle": [{"nombre": "Asociaciones empresariales", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Collaterals / Brochures / Directorios", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Diseño gráfico", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Invitaciones y Fam Trips", "prev": 1154.88, "fc": 525.29, "prevMes": [0.0, 10.52, 846.36, 595.33, 0.0, 0.0, -372.73, 35.17, -846.36, 133.57, 13.93, 739.09], "fcMes": [0.0, 0.0, 0.0, 482.11, 361.82, 0.0, -693.64, 75.0, 75.0, 75.0, 75.0, 75.0], "driver": "total", "refPrev": {"fijo": 96.24, "ratio": 0.078, "pct": 0.054}, "refFc": {"fijo": 43.77, "ratio": 0.035, "pct": 0.023}}, {"nombre": "Publicidad internacional", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Publicidad nacional", "prev": 3876.74, "fc": 4978.35, "prevMes": [129.0, 129.0, 129.0, 226.59, 256.29, 1046.29, 678.54, 263.04, 266.8, 265.32, 214.75, 272.12], "fcMes": [265.32, 265.32, 263.04, 353.04, 254.04, 1004.04, 898.55, 335.0, 335.0, 335.0, 335.0, 335.0], "driver": "total", "refPrev": {"fijo": 323.06, "ratio": 0.263, "pct": 0.18}, "refFc": {"fijo": 414.86, "ratio": 0.333, "pct": 0.216}}, {"nombre": "Relaciones públicas", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Señalética exterior", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Servicios de CENTRAL", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Suscripciones", "prev": 1196.0, "fc": 1245.0, "prevMes": [184.0, 92.0, 92.0, 92.0, 92.0, 92.0, 92.0, 92.0, 92.0, 92.0, 92.0, 92.0], "fcMes": [110.0, 110.0, 110.0, 110.0, 110.0, 110.0, 110.0, 95.0, 95.0, 95.0, 95.0, 95.0], "driver": "total", "refPrev": {"fijo": 99.67, "ratio": 0.081, "pct": 0.055}, "refFc": {"fijo": 103.75, "ratio": 0.083, "pct": 0.054}}, {"nombre": "Otros gastos comerciales y MKT", "prev": 0.0, "fc": 375.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 75.0, 75.0, 75.0, 75.0, 75.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 31.25, "ratio": 0.025, "pct": 0.016}}], "catClave": "marketing"}, {"nombre": "Mantenimiento", "ingreso": false, "seccion": "ind", "esAlojamiento": false, "detalle": [{"nombre": "Aire acondicionado", "prev": 3648.85, "fc": 3432.92, "prevMes": [271.26, 401.67, 140.85, 274.91, 274.91, 274.91, 408.97, 339.23, 274.91, 571.47, 274.91, 140.85], "fcMes": [279.14, 283.16, 145.08, 421.24, 145.08, 283.16, 283.16, 318.58, 318.58, 318.58, 318.58, 318.58], "driver": "total", "refPrev": {"fijo": 304.07, "ratio": 0.248, "pct": 0.169}, "refFc": {"fijo": 286.08, "ratio": 0.229, "pct": 0.149}}, {"nombre": "Alarma y extincion de incendios", "prev": 782.35, "fc": 1152.51, "prevMes": [0.0, 0.0, 95.0, 49.95, 0.0, 164.65, 0.0, 0.0, 144.75, 0.0, 0.0, 328.0], "fcMes": [0.0, 0.0, 255.16, 446.4, 0.0, 0.0, 95.0, 71.19, 71.19, 71.19, 71.19, 71.19], "driver": "total", "refPrev": {"fijo": 65.2, "ratio": 0.053, "pct": 0.036}, "refFc": {"fijo": 96.04, "ratio": 0.077, "pct": 0.05}}, {"nombre": "Compras varias", "prev": 6978.43, "fc": 7911.27, "prevMes": [729.28, 256.56, 472.08, 198.76, 605.38, 530.39, 995.68, 307.45, 318.69, 892.67, 654.4, 1017.09], "fcMes": [1273.39, 699.86, 659.38, 1198.99, 316.75, 685.79, 603.26, 494.77, 494.77, 494.77, 494.77, 494.77], "driver": "total", "refPrev": {"fijo": 581.54, "ratio": 0.474, "pct": 0.324}, "refFc": {"fijo": 659.27, "ratio": 0.528, "pct": 0.344}}, {"nombre": "Contratos de mantenimiento", "prev": 1418.03, "fc": 1195.86, "prevMes": [48.71, 50.08, 50.08, 50.08, 50.08, 50.08, 50.08, 50.08, 50.08, 50.08, 459.3, 459.3], "fcMes": [50.08, 51.53, 51.53, 51.53, 51.53, 51.53, 51.53, 167.32, 167.32, 167.32, 167.32, 167.32], "driver": "total", "refPrev": {"fijo": 118.17, "ratio": 0.096, "pct": 0.066}, "refFc": {"fijo": 99.65, "ratio": 0.08, "pct": 0.052}}, {"nombre": "Contratos mantenimiento Facilitis", "prev": 45950.0, "fc": 52850.0, "prevMes": [3750.0, 3850.0, 3850.0, 3700.0, 3900.0, 4300.0, 3950.0, 3750.0, 3600.0, 3750.0, 3750.0, 3800.0], "fcMes": [4200.0, 4450.0, 4200.0, 3350.0, 3800.0, 4750.0, 5600.0, 4500.0, 4500.0, 4500.0, 4500.0, 4500.0], "driver": "total", "refPrev": {"fijo": 3829.17, "ratio": 3.121, "pct": 2.132}, "refFc": {"fijo": 4404.17, "ratio": 3.53, "pct": 2.297}}, {"nombre": "Gastos de piscinas", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Lámparas y bombillas", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Mantenimiento ascensores", "prev": 8441.56, "fc": 7561.17, "prevMes": [556.31, 556.31, 556.31, 556.31, 556.31, 1762.31, 556.31, 676.19, 556.31, 556.31, 883.77, 668.81], "fcMes": [576.9, 576.9, 576.9, 802.62, 576.9, 576.9, 576.9, 659.43, 659.43, 659.43, 659.43, 659.43], "driver": "total", "refPrev": {"fijo": 703.46, "ratio": 0.573, "pct": 0.392}, "refFc": {"fijo": 630.1, "ratio": 0.505, "pct": 0.329}}, {"nombre": "Mantenimiento jardines", "prev": 84.27, "fc": 36.15, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 34.27, 50.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.23, 7.23, 7.23, 7.23, 7.23], "driver": "total", "refPrev": {"fijo": 7.02, "ratio": 0.006, "pct": 0.004}, "refFc": {"fijo": 3.01, "ratio": 0.002, "pct": 0.002}}, {"nombre": "Mantenimiento moquetas", "prev": 353.28, "fc": 327.76, "prevMes": [29.44, 29.44, 29.44, 29.44, 29.44, 29.44, 29.44, 29.44, 29.44, 29.44, 29.44, 29.44], "fcMes": [30.58, 30.58, 30.58, 30.58, 30.58, 30.58, 30.58, 22.74, 22.74, 22.74, 22.74, 22.74], "driver": "total", "refPrev": {"fijo": 29.44, "ratio": 0.024, "pct": 0.016}, "refFc": {"fijo": 27.31, "ratio": 0.022, "pct": 0.014}}, {"nombre": "Mantenimiento SPA", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Mantenimineto calderas", "prev": 2045.65, "fc": 1409.5, "prevMes": [66.23, 68.22, 68.22, 68.22, 68.22, 68.22, 68.22, 1054.22, 68.22, 311.22, 68.22, 68.22], "fcMes": [68.22, 70.19, 70.19, 70.19, 70.19, 137.13, 70.19, 170.64, 170.64, 170.64, 170.64, 170.64], "driver": "total", "refPrev": {"fijo": 170.47, "ratio": 0.139, "pct": 0.095}, "refFc": {"fijo": 117.46, "ratio": 0.094, "pct": 0.061}}, {"nombre": "Reparacion fontanería", "prev": 0.0, "fc": 38.65, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.73, 7.73, 7.73, 7.73, 7.73], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 3.22, "ratio": 0.003, "pct": 0.002}}, {"nombre": "Reparación maquinaria", "prev": 178.0, "fc": 187.35, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 41.0, 0.0, 137.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 144.0, 0.0, 0.0, 8.67, 8.67, 8.67, 8.67, 8.67], "driver": "total", "refPrev": {"fijo": 14.83, "ratio": 0.012, "pct": 0.008}, "refFc": {"fijo": 15.61, "ratio": 0.013, "pct": 0.008}}, {"nombre": "Reparación pintura", "prev": 0.0, "fc": 77.25, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 15.45, 15.45, 15.45, 15.45, 15.45], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 6.44, "ratio": 0.005, "pct": 0.003}}, {"nombre": "Reparaciones albañilería", "prev": 795.55, "fc": 290.47, "prevMes": [0.0, 0.0, 0.0, 0.0, 156.0, 0.0, 0.0, 0.0, 0.0, 159.12, 480.43, 0.0], "fcMes": [0.0, 0.0, 0.0, 159.12, 0.0, 0.0, 0.0, 26.27, 26.27, 26.27, 26.27, 26.27], "driver": "total", "refPrev": {"fijo": 66.3, "ratio": 0.054, "pct": 0.037}, "refFc": {"fijo": 24.21, "ratio": 0.019, "pct": 0.013}}, {"nombre": "Reparaciones eléctricas", "prev": 541.44, "fc": 12.9, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 541.44, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.58, 2.58, 2.58, 2.58, 2.58], "driver": "total", "refPrev": {"fijo": 45.12, "ratio": 0.037, "pct": 0.025}, "refFc": {"fijo": 1.07, "ratio": 0.001, "pct": 0.001}}, {"nombre": "Otros gastos de mantenimiento", "prev": 0.0, "fc": 120.9, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 24.18, 24.18, 24.18, 24.18, 24.18], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 10.08, "ratio": 0.008, "pct": 0.005}}], "catClave": "mantenimiento"}, {"nombre": "Costes energéticos", "ingreso": false, "seccion": "ind", "esAlojamiento": false, "detalle": [{"nombre": "Electricidad", "prev": 28351.76, "fc": 27924.49, "prevMes": [1640.24, 1526.32, 1555.78, 1700.0, 1875.69, 1900.0, 6628.42, 6500.0, 1036.65, 1364.11, 1739.37, 885.18], "fcMes": [2119.01, 1871.64, 1264.78, 962.96, 1919.85, 2000.0, 4026.25, 2795.0, 2687.5, 2795.0, 2687.5, 2795.0], "driver": "total", "refPrev": {"fijo": 2362.65, "ratio": 1.926, "pct": 1.316}, "refFc": {"fijo": 2327.04, "ratio": 1.865, "pct": 1.214}}, {"nombre": "Agua", "prev": 9908.18, "fc": 11017.29, "prevMes": [885.03, 500.0, 941.06, 550.0, 1098.76, 950.0, 754.21, 950.0, 1039.55, 950.0, 539.57, 750.0], "fcMes": [751.21, 750.0, 608.55, 700.0, 1226.51, 700.0, 1161.02, 1040.0, 1000.0, 1040.0, 1000.0, 1040.0], "driver": "total", "refPrev": {"fijo": 825.68, "ratio": 0.673, "pct": 0.46}, "refFc": {"fijo": 918.11, "ratio": 0.736, "pct": 0.479}}, {"nombre": "Gas", "prev": 20021.69, "fc": 21749.7, "prevMes": [5801.58, 3730.81, 4392.87, 2733.47, -1176.86, 650.0, 310.92, 500.0, 596.86, 354.47, 960.79, 1166.78], "fcMes": [3593.76, 1645.15, 1862.19, 0.0, 2278.69, 1000.0, -150.09, 2340.0, 2250.0, 2340.0, 2250.0, 2340.0], "driver": "total", "refPrev": {"fijo": 1668.47, "ratio": 1.36, "pct": 0.929}, "refFc": {"fijo": 1812.48, "ratio": 1.453, "pct": 0.945}}, {"nombre": "Gasoil", "prev": 71.25, "fc": 30.6, "prevMes": [0.0, 0.0, 0.0, 0.0, 46.07, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 25.18], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.12, 6.12, 6.12, 6.12, 6.12], "driver": "total", "refPrev": {"fijo": 5.94, "ratio": 0.005, "pct": 0.003}, "refFc": {"fijo": 2.55, "ratio": 0.002, "pct": 0.001}}], "catClave": "energeticos"}, {"nombre": "Management fees", "ingreso": false, "seccion": "mf", "esAlojamiento": false, "detalle": [{"nombre": "Canon fijo", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Fees sobre ventas", "prev": 215503.49, "fc": 230067.89, "prevMes": [12678.32, 13621.15, 17471.52, 19874.36, 21093.87, 18272.07, 17634.95, 20501.45, 20804.29, 21683.75, 15746.04, 16121.72], "fcMes": [12410.34, 13913.16, 17978.99, 21320.21, 23193.48, 19054.31, 19427.31, 21156.5, 22150.0, 22650.0, 17903.73, 18909.86], "driver": "total", "refPrev": {"fijo": 17958.62, "ratio": 14.638, "pct": 10.0}, "refFc": {"fijo": 19172.32, "ratio": 15.367, "pct": 10.0}}, {"nombre": "Fees sobre resultado", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}], "catClave": "management_fees"}, {"nombre": "Arrendamientos", "ingreso": false, "seccion": "arr", "esAlojamiento": false, "detalle": [{"nombre": "Alquiler fijo Hotel", "prev": 673660.79, "fc": 694089.18, "prevMes": [55513.87, 55513.87, 55513.87, 55513.87, 55513.87, 55513.87, 55513.87, 57012.74, 57012.74, 57012.74, 57012.74, 57012.74], "fcMes": [57012.74, 57012.74, 57012.74, 57012.74, 57012.74, 57012.74, 57012.74, 59000.0, 59000.0, 59000.0, 59000.0, 59000.0], "driver": "total", "refPrev": {"fijo": 56138.4, "ratio": 45.759, "pct": 31.26}, "refFc": {"fijo": 57840.76, "ratio": 46.359, "pct": 30.169}}, {"nombre": "Alquiler variable Hotel", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Otros alquileres (parking, locales, etc.)", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}], "catClave": "arrendamientos"}, {"nombre": "Otros no operativos", "ingreso": false, "seccion": "onp", "esAlojamiento": false, "detalle": [{"nombre": "Ingresos por alquileres (+)", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Impuestos y tasas", "prev": 12779.08, "fc": 12829.44, "prevMes": [1065.0, 1065.0, 1065.0, 1065.0, 1065.0, 1065.0, 1066.29, 1066.29, 1063.48, 1063.48, 1063.48, 1066.06], "fcMes": [1064.92, 1064.92, 1064.92, 1064.92, 1064.92, 1064.92, 1064.92, 1075.0, 1075.0, 1075.0, 1075.0, 1075.0], "driver": "total", "refPrev": {"fijo": 1064.92, "ratio": 0.868, "pct": 0.593}, "refFc": {"fijo": 1069.12, "ratio": 0.857, "pct": 0.558}}, {"nombre": "Indemnizaciones por despidos", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Seguros", "prev": 7153.66, "fc": 2875.0, "prevMes": [0.0, 1266.4, 0.0, 0.0, 0.0, 0.0, 0.0, 4559.41, 683.47, 214.8, 214.8, 214.78], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 575.0, 575.0, 575.0, 575.0, 575.0], "driver": "total", "refPrev": {"fijo": 596.14, "ratio": 0.486, "pct": 0.332}, "refFc": {"fijo": 239.58, "ratio": 0.192, "pct": 0.125}}, {"nombre": "Capex", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Renting", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Resultados excepcionales", "prev": 0.0, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}, {"nombre": "Otros gastos no operativos", "prev": 0.42, "fc": -0.22, "prevMes": [-0.01, -0.02, -0.09, 0.36, 0.0, 0.0, -0.01, 0.18, -0.04, -0.02, 0.03, 0.04], "fcMes": [-0.01, -0.08, -0.06, 0.0, -0.12, 0.01, 0.04, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 0.03, "ratio": 0.0, "pct": 0.0}, "refFc": {"fijo": -0.02, "ratio": -0.0, "pct": -0.0}}, {"nombre": "Tasa de basura", "prev": 1392.64, "fc": 1737.35, "prevMes": [177.58, 177.58, 177.58, 177.58, 177.58, 177.58, 177.58, 177.58, -28.0, 0.0, 0.0, 0.0], "fcMes": [116.05, 116.05, 116.05, 116.05, 116.05, 116.05, 116.05, 185.0, 185.0, 185.0, 185.0, 185.0], "driver": "total", "refPrev": {"fijo": 116.05, "ratio": 0.095, "pct": 0.065}, "refFc": {"fijo": 144.78, "ratio": 0.116, "pct": 0.076}}, {"nombre": "Subvenciones Inm.No-Fin.", "prev": -8187.23, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -8187.23], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": -682.27, "ratio": -0.556, "pct": -0.38}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}], "catClave": "otros_no_op"}, {"nombre": "Gastos societarios", "ingreso": false, "seccion": "soc", "esAlojamiento": false, "detalle": [{"nombre": "Ingresos excepcionales (+)", "prev": -1744.14, "fc": -3.9, "prevMes": [0.0, -22.7, -13.5, 0.0, 0.01, -80.52, -50.51, -119.0, 0.0, -0.58, -13.11, -1444.23], "fcMes": [-3.74, 0.0, 0.0, -0.1, 0.02, -0.08, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": -145.34, "ratio": -0.118, "pct": -0.081}, "refFc": {"fijo": -0.33, "ratio": -0.0, "pct": -0.0}}, {"nombre": "Amortizaciones", "prev": 75806.27, "fc": 74270.4, "prevMes": [6327.99, 6327.99, 6327.99, 6327.99, 6327.99, 6327.99, 6327.98, 6317.52, 6314.18, 6314.18, 6259.43, 6305.04], "fcMes": [6088.21, 6091.39, 6091.39, 6091.39, 6091.39, 6117.84, 6117.84, 6316.19, 6316.19, 6316.19, 6316.19, 6316.19], "driver": "total", "refPrev": {"fijo": 6317.19, "ratio": 5.149, "pct": 3.518}, "refFc": {"fijo": 6189.2, "ratio": 4.961, "pct": 3.228}}, {"nombre": "Ingresos financieros (+)", "prev": -4.01, "fc": -3.54, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4.01, 0.0, 0.0, 0.0], "fcMes": [0.0, 0.0, 0.0, -3.54, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": -0.33, "ratio": -0.0, "pct": -0.0}, "refFc": {"fijo": -0.29, "ratio": -0.0, "pct": -0.0}}, {"nombre": "Gastos financieros", "prev": 5757.44, "fc": 8691.52, "prevMes": [1115.37, 426.58, 416.07, 1083.84, 394.98, 384.41, 1257.89, 0.0, 0.0, 678.3, 0.0, 0.0], "fcMes": [163.9, 76.3, 96.27, 135.94, 139.77, 8071.01, 8.33, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 479.79, "ratio": 0.391, "pct": 0.267}, "refFc": {"fijo": 724.29, "ratio": 0.581, "pct": 0.378}}, {"nombre": "Impuesto sociedades", "prev": 37248.67, "fc": 0.0, "prevMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 37248.67], "fcMes": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "driver": "total", "refPrev": {"fijo": 3104.06, "ratio": 2.53, "pct": 1.728}, "refFc": {"fijo": 0.0, "ratio": 0.0, "pct": 0.0}}], "catClave": "societarios"}], "drivers": {"ocuMes": [1167.0, 1105.0, 1259.0, 1233.0, 1253.0, 1239.0, 1316.0, 1300.0, 1250.0, 1300.0, 1250.0, 1300.0], "alojMes": [107030.84, 118554.32, 158745.94, 186710.64, 201547.17, 171949.86, 171774.44, 185000.0, 195000.0, 200000.0, 155000.0, 165000.0]}};
+const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const Z = () => new Array(12).fill(0);
+const g3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const n0 = x => (x<0?"-":"") + g3(String(Math.round(Math.abs(x))));
+const $ = id => document.getElementById(id);
+const sum = a => a.reduce((x,y)=>x+y,0);
+const parse = s => { const v = parseFloat(String(s).replace(/\./g,"").replace(",",".")); return isNaN(v)?null:v; };
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+const RB = () => $("refBase").value;   // "fc" | "prev"
+
+// Estado por partida
+D.grupos.forEach(g => {
+  const gp = g.detalle.reduce((a,d)=>a+d.prev,0) || 1;
+  g.detalle.forEach(d => { d.fijo=d.ratio=d.pct=null; d.formula=""; d.manual=new Array(12).fill(null); d.share=d.prev/gp; });
+});
+
+function evalFormula(str, refs) {
+  if (!str || !str.trim()) return null;
+  let s = str.replace(/\[([^\]]+)\]/g, (_,name)=> "(" + (refs[norm(name)] ?? 0) + ")");
+  if (!/^[-+*/().,\d\s]+$/.test(s)) return null;
+  try { return Function('"use strict";return (' + s.replace(/,/g,".") + ')')() || 0; } catch(e){ return null; }
+}
+
+// Versión activa (del navegador) y su incremento por categoría para este hotel.
+function activeVersion(){
+  try { const act=localStorage.getItem("shg_version_activa");
+    const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+    return act && vs[act] ? vs[act] : null; } catch(e){ return null; }
+}
+function incPct(cat){                       // % de incremento de una categoría (override hotel o general)
+  const v=activeVersion(); if(!v||!cat) return 0;
+  const o=(v.overrides && v.overrides[D.idHotel]) || {};
+  const f=(cat in o) ? o[cat] : (v.incrementos ? v.incrementos[cat] : 0);
+  return (f||0)*100;
+}
+function ctx() {
+  const incPorCat={}; D.grupos.forEach(g=> incPorCat[g.catClave]=incPct(g.catClave));
+  return { incPorCat, ocuMes: D.drivers.ocuMes, alojMes: D.drivers.alojMes,
+    ventasTot: Z(), ventasAloj: D.drivers.alojMes, ventasFb: Z(), refs: {} };
+}
+function drvMes(d,c){ return d.driver==="aloj"? c.ventasAloj : d.driver==="fb"? c.ventasFb : c.ventasTot; }
+
+function calcDetalle(d, g, c) {
+  let m;
+  if (g.ingreso) {
+    // Ingresos: sin métodos. Base = forecast con incremento de la categoría; en
+    // Alojamiento tiene prioridad el valor de su hoja (d.aloj) si existe.
+    const inc = c.incPorCat[g.catClave] || 0;
+    m = (g.esAlojamiento && d.aloj) ? d.aloj.slice() : d.fcMes.map(v => v * (1 + inc/100));
+  } else {
+    const usa = d.fijo!=null || d.ratio!=null || d.pct!=null || (d.formula && d.formula.trim());
+    if (!usa) {
+      const inc = c.incPorCat[g.catClave] || 0;   // incremento de la categoría en la versión activa
+      m = d.fcMes.map(v => v * (1 + inc/100));   // base SIEMPRE forecast (la referencia solo cambia las medidas)
+    } else {
+      const drv = drvMes(d,c), fm = evalFormula(d.formula, c.refs) || 0;
+      m = M.map((_,i)=> (d.fijo||0) + (d.ratio||0)*c.ocuMes[i] + (d.pct||0)/100*drv[i] + fm);
+    }
+  }
+  return m.map((v,i)=> d.manual[i]!=null ? d.manual[i] : v);   // override manual por mes (borrar = vuelve a la base)
+}
+
+function waterfall(pick) {   // pick(grupo)->serie mensual del escenario
+  const sec = {};
+  D.grupos.forEach(g => { const s=pick(g); sec[g.seccion]=(sec[g.seccion]||Z()).map((v,i)=>v+s[i]); });
+  const S=k=>sec[k]||Z();
+  const ing=S("ing"), dir=S("dir"), ind=S("ind");
+  const tg=M.map((_,i)=>dir[i]+ind[i]), gop=M.map((_,i)=>ing[i]-tg[i]);
+  const eb=M.map((_,i)=>gop[i]-S("mf")[i]-S("arr")[i]-S("onp")[i]);
+  const rn=M.map((_,i)=>eb[i]-S("soc")[i]);
+  return {ing,tg,gop,eb,rn};
+}
+
+function recompute() {
+  const c = ctx();
+  for (let it=0; it<2; it++) {   // 2 pasadas para converger las fórmulas
+    let vt=Z(), va=Z(), vf=Z();
+    D.grupos.filter(g=>g.seccion==="ing").forEach(g=>g.detalle.forEach(d=>{
+      d._m=calcDetalle(d,g,c); d._m.forEach((v,i)=>{ vt[i]+=v; if(g.esAlojamiento)va[i]+=v; if(g.nombre==="F&B")vf[i]+=v; });
+    }));
+    c.ventasTot=vt; c.ventasAloj=va.some(x=>x)?va:D.drivers.alojMes; c.ventasFb=vf;
+    D.grupos.forEach(g=>{ g._m=Z(); g.detalle.forEach(d=>{ d._m=calcDetalle(d,g,c); d._m.forEach((v,i)=>g._m[i]+=v); }); });
+    c.refs={}; D.grupos.forEach(g=>g.detalle.forEach(d=>{ c.refs[norm(d.nombre)]=sum(d._m); }));
+    const w=waterfall(g=>g._m);
+    c.refs["ingresos"]=c.refs["total ingresos"]=sum(w.ing);
+    c.refs["gastos"]=c.refs["total gastos"]=sum(w.tg);
+    c.refs["gop"]=sum(w.gop); c.refs["ebitda"]=sum(w.eb); c.refs["resultado"]=c.refs["resultado neto"]=sum(w.rn);
+    window._wP=w;
+  }
+  window._wR=waterfall(g=>escGrupo(g,"prevMes"));
+  window._wF=waterfall(g=>escGrupo(g,"fcMes"));
+  writeValues();
+}
+function escGrupo(g,campo){ const s=Z(); g.detalle.forEach(d=>d[campo].forEach((v,i)=>s[i]+=v)); return s; }
+
+// ---- Escritura de celdas ----
+function cel(v){ return n0(v); }
+function celD(v, ref, mm){ let h=`<span>${n0(v)}</span>`; if(ref!=null){ const dv=v-ref, p=Math.abs(ref)>0.5?dv/Math.abs(ref)*100:0;
+  const good=(dv>=0)===(mm!==false);
+  h+=`<span class="delta ${good?'up':'down'}">${dv>=0?'+':''}${n0(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } return h; }
+function setHint(id,txt){ const e=$(id); if(e) e.textContent=txt; }
+
+function setEsc(pfx, serie){ // real/fcast: meses + total (sin delta)
+  serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e) e.textContent=cel(v); });
+  const t=$(pfx+"-t"); if(t) t.textContent=cel(sum(serie));
+}
+function setPpto(pfx, serie, refSerie, mm){ // ppto: meses (input) + total (con delta)
+  serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); } });
+  const t=$(pfx+"-t"); if(t) t.innerHTML=celD(sum(serie), sum(refSerie), mm);
+}
+function writeValues(){
+  const rb=RB();
+  D.grupos.forEach((g,gi)=>{
+    setEsc("R-g"+gi, escGrupo(g,"prevMes")); setEsc("F-g"+gi, escGrupo(g,"fcMes"));
+    const t=$("P-g"+gi+"-t"); if(t) t.innerHTML=celD(sum(g._m), sum(escGrupo(g,"fcMes")), g.ingreso);
+    g._m.forEach((v,i)=>{ const e=$("P-g"+gi+"-"+i); if(e) e.textContent=cel(v); });
+    g.detalle.forEach((d,di)=>{
+      setEsc("R-"+gi+"-"+di, d.prevMes); setEsc("F-"+gi+"-"+di, d.fcMes);
+      setPpto("P-"+gi+"-"+di, d._m, d.fcMes, g.ingreso);   // Δ SIEMPRE vs forecast
+      d.manual.forEach((mv,i)=>{ const e=$("P-"+gi+"-"+di+"-"+i); if(e) e.classList.toggle("manual", mv!=null); });
+      const r = rb==="prev"?d.refPrev:d.refFc;
+      setHint("h-fijo-"+gi+"-"+di, n0(r.fijo));
+      setHint("h-ratio-"+gi+"-"+di, r.ratio.toLocaleString("es-ES"));
+      setHint("h-pct-"+gi+"-"+di, r.pct.toLocaleString("es-ES")+"%");
+    });
+  });
+  const MM={ "w-ing":true, "w-tg":false, "w-gop":true, "w-eb":true, "w-rn":true };
+  [["w-ing",_wR.ing,_wF.ing,_wP.ing],["w-tg",_wR.tg,_wF.tg,_wP.tg],["w-gop",_wR.gop,_wF.gop,_wP.gop],
+   ["w-eb",_wR.eb,_wF.eb,_wP.eb],["w-rn",_wR.rn,_wF.rn,_wP.rn]].forEach(([p,r,f,pp])=>{
+    setEsc(p+"-R",r); setEsc(p+"-F",f);
+    pp.forEach((v,i)=>{ const e=$(p+"-P-"+i); if(e) e.textContent=cel(v); });
+    const t=$(p+"-P-t"); if(t) t.innerHTML=celD(sum(pp), sum(f), MM[p]);   // Δ vs forecast
+  });
+}
+
+// ---- Construcción ----
+function escCols(pfx, L){ return M.map((_,i)=>`<td class="num m${L}" id="${pfx}-${i}"></td>`).join("")
+  + `<td class="num a${L}" id="${pfx}-t"></td>`; }
+function pptoCols(pfx, editable){
+  const meses = M.map((_,i)=> editable
+    ? `<td class="mP"><input class="mp" id="${pfx}-${i}" data-p="${pfx}" data-m="${i}"></td>`
+    : `<td class="num mP" id="${pfx}-${i}"></td>`).join("");
+  return meses + `<td class="num aP" id="${pfx}-t"></td>`;
+}
+const MCLS = ["mfijo","mratio","mpct","mform"];
+function celdasVacias(){ return MCLS.map(c=>`<td class="mcol ${c}"></td>`).join(""); }
+function metodo(gi,di,d){
+  if(d===null) return celdasVacias();
+  const r=d.refFc;
+  return `<td class="mcol mfijo"><input class="mi" data-g="${gi}" data-d="${di}" data-k="fijo" placeholder="€/mes"><span class="hint" id="h-fijo-${gi}-${di}">${n0(r.fijo)}</span></td>`
+   + `<td class="mcol mratio"><input class="mi" data-g="${gi}" data-d="${di}" data-k="ratio" placeholder="€/ocup"><span class="hint" id="h-ratio-${gi}-${di}">${r.ratio.toLocaleString("es-ES")}</span></td>`
+   + `<td class="mcol mpct"><input class="mi" data-g="${gi}" data-d="${di}" data-k="pct" placeholder="%"><span class="hint" id="h-pct-${gi}-${di}">${r.pct.toLocaleString("es-ES")}%</span></td>`
+   + `<td class="mcol mform"><input class="mi wide" data-g="${gi}" data-d="${di}" data-k="formula" placeholder="clic para elegir partida"></td>`;
+}
+function margen(cls,p,label){ return `<tr class="${cls}"><td class="lbl">${label}</td>`
+  + escCols(p+"-R","R") + escCols(p+"-F","F") + pptoCols(p+"-P",false)
+  + celdasVacias() + `</tr>`; }
+
+const H = (L)=> M.map(m=>`<th class="num m${L}">${m}</th>`).join("");
+$("cab").innerHTML = '<th class="lbl">Concepto</th>'
+  + H("R")+`<th class="num aR esc"><span class="cx" data-v="vR">▸</span>Real 2025</th>`
+  + H("F")+`<th class="num aF esc"><span class="cx" data-v="vF">▸</span>Fcast 2026</th>`
+  + H("P")+`<th class="num aP esc"><span class="cx" data-v="vP">▸</span>Ppto 2027</th>`
+  + '<th class="num mcol mfijo">Fijo/mes</th><th class="num mcol mratio">Ratio</th><th class="num mcol mpct">%</th><th class="num mcol mform">Fórmula</th>';
+
+let html="", puesto={};
+D.grupos.forEach((g,gi)=>{
+  if(g.seccion==="ing"&&!puesto.ing){ html+=`<tr class="sec"><td colspan="99">Ingresos</td></tr>`; puesto.ing=1; }
+  if(g.seccion==="dir"&&!puesto.gas){ html+=`<tr class="sec"><td colspan="99">Costes</td></tr>`; puesto.gas=1; }
+  html+=`<tr class="grupo" data-g="${gi}"><td class="lbl"><span class="caret">›</span>${g.nombre}</td>`
+    + escCols("R-g"+gi,"R") + escCols("F-g"+gi,"F") + pptoCols("P-g"+gi,false)
+    + celdasVacias() + `</tr>`;
+  g.detalle.forEach((d,di)=>{
+    html+=`<tr class="detalle" data-g="${gi}"><td class="lbl">${d.nombre}</td>`
+      + escCols("R-"+gi+"-"+di,"R") + escCols("F-"+gi+"-"+di,"F") + pptoCols("P-"+gi+"-"+di,true)
+      + metodo(gi,di,g.ingreso?null:d) + `</tr>`;
+  });
+  const s=D.grupos[gi+1];
+  if(g.seccion==="ing"&&(!s||s.seccion!=="ing")) html+=margen("tI","w-ing","TOTAL INGRESOS");
+  if(g.seccion==="ind"&&(!s||s.seccion!=="ind")){ html+=margen("tG","w-tg","TOTAL GASTOS"); html+=margen("tP","w-gop","GOP"); }
+  if(g.seccion==="onp") html+=margen("tE","w-eb","EBITDA");
+  if(g.seccion==="soc") html+=margen("tR","w-rn","RESULTADO NETO");
+});
+$("cuerpo").innerHTML = html;
+
+// selector de hoteles
+D.hoteles.forEach(h=>{ const o=document.createElement("option"); o.value=h.id; o.textContent=h.nombre; if(h.id===D.idHotel)o.selected=true; $("selHotel").appendChild(o); });
+
+// ---- Interacción ----
+document.querySelectorAll("tr.grupo").forEach(tr=>tr.addEventListener("click",e=>{
+  if(e.target.closest("input")) return;
+  const gi=tr.dataset.g, ab=!tr.classList.contains("open"); tr.classList.toggle("open",ab);
+  document.querySelectorAll(`tr.detalle[data-g="${gi}"]`).forEach(d=>d.classList.toggle("visible",ab));
+}));
+document.querySelectorAll("input.mi").forEach(inp=>inp.addEventListener("input",()=>{
+  const d=D.grupos[inp.dataset.g].detalle[inp.dataset.d], k=inp.dataset.k;
+  d[k] = k==="formula" ? inp.value : parse(inp.value);
+  recompute(); guardarMedidas();
+}));
+document.querySelectorAll("input.mp").forEach(inp=>{
+  inp.addEventListener("input",()=>{
+    const [ , gi, di, m ] = inp.id.split("-"); const d=D.grupos[gi].detalle[di];
+    d.manual[+m] = inp.value.trim()==="" ? null : parse(inp.value);
+    recompute(); guardarMedidas();
+  });
+  inp.addEventListener("blur",()=>{   // si borro el manual, la casilla recupera el criterio
+    const [ , gi, di, m ] = inp.id.split("-"); const d=D.grupos[gi].detalle[di];
+    if(d.manual[+m]==null) inp.value=n0(d._m[+m]);
+  });
+});
+$("refBase").addEventListener("change",recompute);
+
+// Tira compacta con los incrementos por partida de la versión activa (solo lectura; se editan en Inicio).
+function pintarVinc(){
+  const v=activeVersion(), cont=$("vinc");
+  if(!v){ cont.innerHTML='<span class="vlbl">Incrementos de la versión</span><span class="chip">Sin versión activa · Ppto = forecast</span>'; return; }
+  const fmt=x=> (x>0?'+':'')+(Math.round(x*10)/10).toLocaleString('es-ES')+'%';
+  const chips=D.grupos.map(g=>{ const p=incPct(g.catClave); if(!p) return "";
+    return `<span class="chip ${g.ingreso?'ing':'gas'}" title="${g.nombre}">${g.nombre} ${fmt(p)}</span>`; }).filter(Boolean).join("");
+  cont.innerHTML=`<span class="vlbl">Incrementos · ${v.nombre}</span>` + (chips || '<span class="chip">todos 0% · Ppto = forecast</span>');
+}
+
+// Desplegar meses por escenario desde la cabecera de la tabla (caret en Real/Fcast/Ppto).
+document.querySelectorAll("#cab .cx").forEach(cx=> cx.addEventListener("click", e=>{
+  e.stopPropagation(); const on=$("t").classList.toggle(cx.dataset.v); cx.textContent = on ? "▾" : "▸";
+}));
+
+// Selector de partidas para las fórmulas
+const TOKENS = ["Ingresos","Total Gastos","GOP","EBITDA","Resultado"];
+D.grupos.forEach(g=>g.detalle.forEach(d=>{ if(!TOKENS.includes(d.nombre)) TOKENS.push(d.nombre); }));
+const fpick=$("fpick");
+document.querySelectorAll('input.mi[data-k="formula"]').forEach(inp=>{
+  inp.addEventListener("focus",()=>{
+    fpick.innerHTML='<div class="fp-h">Insertar partida en la fórmula</div>'+TOKENS.map(t=>`<div class="fp-item">[${t}]</div>`).join("");
+    const r=inp.getBoundingClientRect();
+    fpick.style.left=(r.left+scrollX)+"px"; fpick.style.top=(r.bottom+scrollY+2)+"px";
+    fpick.style.display="block"; fpick._inp=inp;
+  });
+  inp.addEventListener("blur",()=>setTimeout(()=>{ fpick.style.display="none"; },180));
+});
+fpick.addEventListener("mousedown",e=>{ const it=e.target.closest(".fp-item"); if(!it) return; e.preventDefault();
+  const inp=fpick._inp; const s=inp.selectionStart ?? inp.value.length;
+  inp.value=inp.value.slice(0,s)+it.textContent+inp.value.slice(s); inp.dispatchEvent(new Event("input")); inp.focus();
+});
+$("toggleAll").addEventListener("click",()=>{ const abrir=$("toggleAll").textContent.startsWith("Desplegar");
+  document.querySelectorAll("tr.grupo").forEach(tr=>{ tr.classList.toggle("open",abrir);
+    document.querySelectorAll(`tr.detalle[data-g="${tr.dataset.g}"]`).forEach(d=>d.classList.toggle("visible",abrir)); });
+  $("toggleAll").textContent=abrir?"Contraer partidas":"Desplegar partidas"; });
+$("selHotel").addEventListener("change",()=>alert("En la app: recarga el presupuesto del hotel seleccionado."));
+
+// ---- Medidas por hotel: autoguardado sobre la versión activa y clonado de otro hotel ----
+function claveMedida(g,d){ return (g.catClave||"") + "::" + norm(d.nombre); }
+function recogerMedidas(){
+  const med={};
+  D.grupos.forEach(g=>g.detalle.forEach(d=>{
+    const tiene = d.fijo!=null||d.ratio!=null||d.pct!=null||(d.formula&&d.formula.trim())||d.manual.some(x=>x!=null);
+    if(tiene) med[claveMedida(g,d)] = {fijo:d.fijo, ratio:d.ratio, pct:d.pct, formula:d.formula, manual:d.manual};
+  }));
+  return med;
+}
+function marcarGuardado(txt){ const e=$("savedHint"); if(!e) return; e.style.opacity=1; e.textContent=txt||"Guardado ✓";
+  clearTimeout(marcarGuardado._t); marcarGuardado._t=setTimeout(()=>{ e.style.opacity=0; }, 1600); }
+let _saveT=null;
+function guardarMedidas(){
+  const v=activeVersion(); if(!v){ marcarGuardado("Sin versión activa: no se guarda"); return; }
+  clearTimeout(_saveT);
+  _saveT=setTimeout(()=>{ try{
+    const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+    const act=localStorage.getItem("shg_version_activa"); if(!act||!vs[act]) return;
+    vs[act].medidas = vs[act].medidas || {};
+    vs[act].medidas[D.idHotel] = recogerMedidas();
+    vs[act].modificada = new Date().toISOString();
+    localStorage.setItem("shg_versiones", JSON.stringify(vs));
+    if(window.SHG) SHG.pushHotel(act, D.idHotel);   // guardar en SharePoint
+    marcarGuardado();
+  }catch(e){} }, 400);
+}
+function aplicarMedidas(med){
+  D.grupos.forEach((g,gi)=>g.detalle.forEach((d,di)=>{
+    const m=med[claveMedida(g,d)];
+    d.fijo=d.ratio=d.pct=null; d.formula=""; d.manual=new Array(12).fill(null);
+    if(m){ d.fijo=m.fijo??null; d.ratio=m.ratio??null; d.pct=m.pct??null; d.formula=m.formula||"";
+      d.manual=Array.isArray(m.manual)?m.manual.slice():new Array(12).fill(null); }
+    ["fijo","ratio","pct","formula"].forEach(k=>{ const inp=document.querySelector(`input.mi[data-g="${gi}"][data-d="${di}"][data-k="${k}"]`);
+      if(inp) inp.value = k==="formula" ? d.formula : (d[k]!=null ? d[k] : ""); });
+  }));
+}
+function cargarMedidas(){ const v=activeVersion(); if(v&&v.medidas&&v.medidas[D.idHotel]) aplicarMedidas(v.medidas[D.idHotel]); }
+
+// Selector de hotel de origen para clonar (sin selección por defecto, excluye el actual)
+$("cloneHotel").innerHTML='<option value="">Elige un hotel…</option>';
+D.hoteles.filter(h=>h.id!==D.idHotel).forEach(h=>{ const o=document.createElement("option"); o.value=h.id; o.textContent=h.nombre; $("cloneHotel").appendChild(o); });
+$("cloneHotel").addEventListener("change",()=>{ $("cloneBtn").disabled = !$("cloneHotel").value; });
+$("cloneBtn").addEventListener("click",()=>{
+  if(!$("cloneHotel").value) return;
+  const v=activeVersion();
+  if(!v){ alert("Abre o crea una versión activa (en Inicio) para poder clonar medidas."); return; }
+  const src=+$("cloneHotel").value;
+  const nom=$("cloneHotel").selectedOptions[0]?$("cloneHotel").selectedOptions[0].textContent:"";
+  if(!v.medidas||!v.medidas[src]){ alert(`"${nom}" no tiene medidas guardadas en esta versión. Edítalo primero.`); return; }
+  if(!confirm(`¿Clonar las medidas de "${nom}" sobre este hotel? Se sobrescriben las medidas actuales.`)) return;
+  aplicarMedidas(v.medidas[src]); recompute(); guardarMedidas(); marcarGuardado("Medidas clonadas ✓");
+});
+
+pintarVinc(); cargarMedidas(); recompute();
+</script>
+</body>
+</html>

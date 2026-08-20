@@ -115,10 +115,99 @@
     return graphCall("/sites/" + sid + "/lists/" + lid + "/items/" + itemId, "DELETE");
   }
 
+  // ---- Capa de datos: versiones (con sus datos por hotel) sobre las dos listas ----
+  var LS_VS = "shg_versiones", LS_ACT = "shg_version_activa";
+  var _conectado = false;
+  var _idByTitle = {};   // { nombreLista: { Title: itemId } } para saber POST vs PATCH
+
+  function _parse(s) { try { return s ? JSON.parse(s) : {}; } catch (e) { return {}; } }
+
+  // Descarga las dos listas y reconstruye el objeto shg_versiones en localStorage.
+  async function cargarTodo() {
+    var colsV = await getCols(C.listaVersiones), fAnio = interno(colsV, "Año");
+    var vers = await leerItems(C.listaVersiones);
+    var hots = await leerItems(C.listaHoteles);
+    _idByTitle[C.listaVersiones] = {}; _idByTitle[C.listaHoteles] = {};
+    var out = {};
+    vers.forEach(function (it) {
+      var f = it.fields || {}, id = f.Title; if (!id) return;
+      _idByTitle[C.listaVersiones][id] = it.id;
+      out[id] = { anio: +(f[fAnio] || 0), nombre: f.Nombre || "", autor: f.Autor || "",
+        hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON),
+        overrides: {}, medidas: {}, alojamiento: {}, personal: {},
+        creada: f.Creada || "", modificada: f.Modificada || "" };
+    });
+    hots.forEach(function (it) {
+      var f = it.fields || {}, t = f.Title; if (!t) return;
+      _idByTitle[C.listaHoteles][t] = it.id;
+      var vid = f.VersionId, hid = String(f.HotelId);
+      if (!out[vid]) return;
+      if (f.OverridesJSON)    out[vid].overrides[hid]   = _parse(f.OverridesJSON);
+      if (f.MedidasJSON)      out[vid].medidas[hid]      = _parse(f.MedidasJSON);
+      if (f.AlojamientoJSON)  out[vid].alojamiento[hid]  = _parse(f.AlojamientoJSON);
+      if (f.PersonalJSON)     out[vid].personal[hid]     = _parse(f.PersonalJSON);
+    });
+    localStorage.setItem(LS_VS, JSON.stringify(out));
+    _conectado = true;
+    return out;
+  }
+
+  // Guarda (upsert) la fila de metadatos de una versión desde localStorage.
+  async function pushVersion(versionId) {
+    if (!_conectado) return;
+    var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
+    var cols = await getCols(C.listaVersiones), fAnio = interno(cols, "Año");
+    var fields = { Title: versionId, Nombre: reg.nombre || "", Autor: reg.autor || "",
+      Hipotesis: reg.hipotesis || "", IncrementosJSON: JSON.stringify(reg.incrementos || {}),
+      Creada: reg.creada || new Date().toISOString(), Modificada: reg.modificada || new Date().toISOString() };
+    fields[fAnio] = Number(reg.anio) || 0;
+    var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
+    if (id) await actualizarItem(C.listaVersiones, id, fields);
+    else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
+  }
+
+  // Guarda (upsert) la fila de un hotel de una versión desde localStorage.
+  async function pushHotel(versionId, hotelId) {
+    if (!_conectado) return;
+    var reg = (_parse(localStorage.getItem(LS_VS)))[versionId]; if (!reg) return;
+    var hid = String(hotelId), title = versionId + "_" + hid;
+    var fields = { Title: title, VersionId: versionId, HotelId: Number(hotelId) || 0,
+      OverridesJSON:   JSON.stringify((reg.overrides   && reg.overrides[hid])   || {}),
+      MedidasJSON:     JSON.stringify((reg.medidas     && reg.medidas[hid])     || {}),
+      AlojamientoJSON: JSON.stringify((reg.alojamiento && reg.alojamiento[hid]) || {}),
+      PersonalJSON:    JSON.stringify((reg.personal    && reg.personal[hid])    || {}) };
+    var id = _idByTitle[C.listaHoteles] && _idByTitle[C.listaHoteles][title];
+    if (id) await actualizarItem(C.listaHoteles, id, fields);
+    else { var c = await crearItem(C.listaHoteles, fields); _idByTitle[C.listaHoteles][title] = c.id; }
+  }
+
+  // Sincroniza una vez por sesión al abrir cualquier pantalla en GitHub Pages: hace
+  // login, descarga las versiones a localStorage y recarga (para que la página se
+  // pinte con los datos frescos). En local no hace nada (modo localStorage).
+  async function autoSync() {
+    if (location.hostname.indexOf("github.io") === -1) return;   // modo local
+    if (sessionStorage.getItem("shg_synced")) return;            // ya sincronizado esta sesión
+    document.documentElement.style.visibility = "hidden";        // evita el parpadeo
+    try {
+      await init();
+      if (!cuenta()) { login(); return; }                        // redirige a login corporativo
+      await cargarTodo();
+      sessionStorage.setItem("shg_synced", "1");
+      location.reload();
+    } catch (e) {
+      console.warn("Nube no disponible, modo local:", e);
+      sessionStorage.setItem("shg_synced", "1");
+      document.documentElement.style.visibility = "";
+    }
+  }
+  function conectado() { return _conectado; }
+
   window.SHG = {
     init: init, login: login, logout: logout, cuenta: cuenta,
     graphCall: graphCall, getSiteId: getSiteId, getListId: getListId,
     getCols: getCols, interno: interno,
     leerItems: leerItems, crearItem: crearItem, actualizarItem: actualizarItem, borrarItem: borrarItem,
+    cargarTodo: cargarTodo, pushVersion: pushVersion, pushHotel: pushHotel,
+    autoSync: autoSync, conectado: conectado,
   };
 })();
