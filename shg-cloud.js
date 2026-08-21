@@ -268,12 +268,15 @@
     } catch (e) { console.error("Nube (versiones):", e); }
 
     // Descarga los datos base de la página desde SharePoint y los entrega a la página.
+    _loading(true);
     try {
       var D = await descargarDatosSP(pagina);
       _entregarDatos(D);
+      setTimeout(function () { _loading(false); }, 60);   // se quita tras pintar
       _estado("conectado ✓ · " + (sesion() ? sesion().nombre : ""), "ok");
     } catch (e) {
       console.error("Nube (datos):", e);
+      _loading(false);
       _estado("error: " + e.message, "err");
       _bloquear("No se pudieron cargar los datos: " + e.message);
     }
@@ -286,7 +289,10 @@
   function _entregarDatos(D) { if (_datosResolve) { _datosResolve(D); _datosResolve = null; } }
 
   // Descarga datos/<pagina>.json de la biblioteca Presupuesto_Datos (SharePoint).
+  // Cachea en sessionStorage para que volver a una página ya vista sea instantáneo.
   async function descargarDatosSP(pagina) {
+    var ck = "shg_datos_" + pagina;
+    try { var c = sessionStorage.getItem(ck); if (c) return JSON.parse(c); } catch (e) {}
     var sid = await getSiteId();
     var dr = await graphCall("/sites/" + sid + "/drives?$select=id,name");
     var drive = (dr.value || []).filter(function (d) { return d.name === C.listaDatos; })[0];
@@ -295,7 +301,9 @@
     var r = await fetch("https://graph.microsoft.com/v1.0/drives/" + drive.id +
       "/root:/" + pagina + ".json:/content", { headers: { Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("No se pudo descargar " + pagina + ".json (" + r.status + ")");
-    return r.json();
+    var txt = await r.text();
+    try { sessionStorage.setItem(ck, txt); } catch (e) {}   // puede fallar si es muy grande; da igual
+    return JSON.parse(txt);
   }
 
   // La usa cada página: devuelve los datos base. En local, del fichero local; en la
@@ -373,6 +381,21 @@
   }
 
   // Overlay de bloqueo a pantalla completa.
+  // Indicador de carga a pantalla completa mientras se descargan los datos.
+  function _loading(on) {
+    var id = "shgCargando", e = document.getElementById(id);
+    if (on) {
+      if (!e) {
+        e = document.createElement("div"); e.id = id;
+        e.style.cssText = "position:fixed;inset:0;z-index:9998;display:flex;align-items:center;"
+          + "justify-content:center;background:var(--bg,#f6f7f9);color:var(--muted,#6b7688);"
+          + "font-family:'Segoe UI',system-ui,sans-serif;font-size:14px";
+        e.textContent = "Cargando datos…";
+        document.body.appendChild(e);
+      }
+    } else if (e) { e.remove(); }
+  }
+
   function _bloquear(mensaje) {
     document.documentElement.style.visibility = "";
     var d = document.createElement("div");
