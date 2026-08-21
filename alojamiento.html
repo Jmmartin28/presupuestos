@@ -127,6 +127,14 @@
       <button class="btn" id="limpiar">Limpiar Datos</button>
       <span id="savedHint" style="font-size:11.5px;color:var(--inp);align-self:center;transition:opacity .4s;"></span>
     </div>
+    <div id="centralMfSec" style="display:none; margin-bottom:14px">
+      <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 6px">Ingresos Management Fees de la Central (intragrupo)</h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <label style="cursor:pointer;font-size:12.5px"><input type="checkbox" id="centralManualChk"> Introducir importes manualmente</label>
+        <span style="font-size:11.5px;color:var(--muted)">Si se deja sin marcar, el Ppto = Σ del coste de MF de las hoteleras.</span>
+      </div>
+      <div class="card" id="centralMfBox" style="display:none;padding:10px"></div>
+    </div>
     <div class="card">
       <table id="t"><thead><tr id="cab"></tr></thead><tbody id="cuerpo"></tbody></table>
     </div>
@@ -314,6 +322,36 @@ document.querySelector("h1").textContent = "Alojamiento · " + D.nombre;
 (function(){ const s=document.querySelector(".sub"); if(s) s.textContent = D.sub; })();
 
 recompute();
+
+// Override manual del ingreso MF de la Central (intragrupo). Solo si la entidad es la Central.
+(function(){
+  if(!D.esCentral) return;
+  $("centralMfSec").style.display = "";
+  const MESES=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const numMf = s => { const v=parseFloat(String(s).replace(/\./g,"").replace(",",".")); return isNaN(v)?0:v; };
+  const chk=$("centralManualChk"), box=$("centralMfBox");
+  let mf=null;
+  try{ const a=_activeVer(), vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+    if(a && vs[a] && Array.isArray(vs[a].centralMf) && vs[a].centralMf.length===12) mf=vs[a].centralMf.slice(); }catch(e){}
+  let _t=null;
+  function marcar(t){ const h=$("savedHint"); if(h){ h.textContent=t; h.style.opacity=1; clearTimeout(marcar._t); marcar._t=setTimeout(()=>h.style.opacity=0,1500);} }
+  function guardar(arr){ const a=_activeVer(); if(!a){ marcar("Sin versión activa"); return; }
+    try{ const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[a]) return;
+      vs[a].centralMf = arr; vs[a].modificada=new Date().toISOString();
+      localStorage.setItem("shg_versiones", JSON.stringify(vs));
+      clearTimeout(_t); _t=setTimeout(()=>{ if(window.SHG) SHG.pushVersion(a); }, 700);
+      marcar("✎ cambios registrados"); }catch(e){} }
+  function pintar(){ box.style.display = chk.checked ? "" : "none";
+    if(!chk.checked){ box.innerHTML=""; return; }
+    const v = Array.isArray(mf)?mf:new Array(12).fill(0);
+    box.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' + v.map((x,i)=>
+      `<label style="font-size:11px;color:var(--muted)">${MESES[i]}<br><input data-mm="${i}" value="${x?n0(x):''}"`
+      + ` style="width:82px;text-align:right;padding:3px 5px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit"></label>`).join("") + '</div>';
+    box.querySelectorAll("input").forEach(inp=> inp.addEventListener("input", ()=>{
+      if(!Array.isArray(mf)) mf=new Array(12).fill(0); mf[+inp.dataset.mm]=numMf(inp.value); guardar(mf); })); }
+  chk.checked = mf!==null; pintar();
+  chk.addEventListener("change", ()=>{ if(chk.checked){ if(!Array.isArray(mf)) mf=new Array(12).fill(0); } else { mf=null; } guardar(mf); pintar(); });
+})();
 })();
 </script>
 </body>
