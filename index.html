@@ -87,9 +87,9 @@
 </head>
 <body>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-  <script src="config.js?v=4"></script>
-  <script src="shg-cloud.js?v=4"></script>
-  <script>window.SHG && SHG.autoSync && SHG.autoSync();</script>
+  <script src="config.js?v=5"></script>
+  <script src="shg-cloud.js?v=5"></script>
+  <script>window.SHG && SHG.autoSync && SHG.autoSync("index");</script>
   <span class="ab-nube" id="abNube">Nube: comprobando…</span>
   <div class="wrap">
     <h1>Presupuestos SHG · Inicio</h1>
@@ -133,6 +133,7 @@
         <div class="fld"><label>Ejercicio objetivo</label><input type="number" id="anio" value="2027" style="width:110px"></div>
         <div class="fld"><label>Nombre de la versión</label><input type="text" id="nombre" placeholder="p.ej. Ppto 2027 v1" style="min-width:240px"></div>
         <div class="fld"><label>Autor</label><input type="text" id="autor" placeholder="tu nombre" style="min-width:180px"></div>
+        <div class="fld"><label>Fecha de auditoría (real → ppto)</label><select id="mesAud" style="min-width:220px"></select></div>
         <div class="fld" style="flex:1"><label>Hipótesis / notas</label><textarea id="hipotesis" placeholder="Supuestos de la versión"></textarea></div>
       </div>
 
@@ -171,7 +172,8 @@
   </div></div>
 
 <script>
-const D = {"anio": 2027, "categorias": [{"clave": "alojamiento", "etiqueta": "Alojamiento", "esIngreso": true}, {"clave": "fb", "etiqueta": "F&B", "esIngreso": true}, {"clave": "varios", "etiqueta": "Varios", "esIngreso": true}, {"clave": "mf_ing", "etiqueta": "MF y otros servicios", "esIngreso": true}, {"clave": "consumos_fb", "etiqueta": "Consumos F&B", "esIngreso": false}, {"clave": "personal", "etiqueta": "Personal", "esIngreso": false}, {"clave": "g_alojamiento", "etiqueta": "Gastos Alojamiento", "esIngreso": false}, {"clave": "g_fb", "etiqueta": "Gastos F&B", "esIngreso": false}, {"clave": "otros_dptos", "etiqueta": "Otros departamentos", "esIngreso": false}, {"clave": "ayg", "etiqueta": "Administración & Generales", "esIngreso": false}, {"clave": "sistemas", "etiqueta": "Sistemas", "esIngreso": false}, {"clave": "marketing", "etiqueta": "Comercial & Marketing", "esIngreso": false}, {"clave": "mantenimiento", "etiqueta": "Mantenimiento", "esIngreso": false}, {"clave": "energeticos", "etiqueta": "Costes energéticos", "esIngreso": false}, {"clave": "management_fees", "etiqueta": "Management fees", "esIngreso": false}, {"clave": "arrendamientos", "etiqueta": "Arrendamientos", "esIngreso": false}, {"clave": "otros_no_op", "etiqueta": "Otros no operativos", "esIngreso": false}, {"clave": "societarios", "etiqueta": "Gastos societarios", "esIngreso": false}], "fcGrupo": {"alojamiento": 48547409, "fb": 10039038, "varios": 11115928, "mf_ing": 0, "consumos_fb": 3946074, "personal": 21448891, "g_alojamiento": 10960130, "g_fb": 203470, "otros_dptos": 357716, "ayg": 1680730, "sistemas": 895437, "marketing": 590963, "mantenimiento": 1866919, "energeticos": 2609724, "management_fees": 4734570, "arrendamientos": 0, "otros_no_op": 16816894, "societarios": 3289599}, "hoteles": [{"id": 67, "nombre": "Bahía Malaga S.L.", "grupo": "SHG", "hotelera": false}, {"id": 44, "nombre": "CENTRAL ESPAÑA", "grupo": "SHG", "hotelera": false}, {"id": 59, "nombre": "FACILITIES", "grupo": "SHG", "hotelera": false}, {"id": 66, "nombre": "Hitaca Hotels & Resorts", "grupo": "SHG", "hotelera": false}, {"id": 68, "nombre": "Maral Hostelera, SL", "grupo": "SHG", "hotelera": false}, {"id": 96, "nombre": "SB Academy", "grupo": "SHG", "hotelera": false}, {"id": 23, "nombre": "AT Museo", "grupo": "SHG", "hotelera": true}, {"id": 101, "nombre": "El Arenal", "grupo": "Isakar", "hotelera": true}, {"id": 53, "nombre": "Hoy no me puedo levantar", "grupo": "SHG", "hotelera": true}, {"id": 97, "nombre": "ITC Aptos Córdoba", "grupo": "SHG", "hotelera": true}, {"id": 56, "nombre": "ITC Artemisa", "grupo": "SHG", "hotelera": true}, {"id": 64, "nombre": "ITC Barcelona", "grupo": "Independientes", "hotelera": true}, {"id": 81, "nombre": "ITC Ciudad de Haro", "grupo": "SHG", "hotelera": true}, {"id": 57, "nombre": "ITC Colón", "grupo": "SHG", "hotelera": true}, {"id": 75, "nombre": "ITC Infantas", "grupo": "SHG", "hotelera": true}, {"id": 54, "nombre": "ITC Jerez", "grupo": "SHG", "hotelera": true}, {"id": 77, "nombre": "ITC Madrid", "grupo": "SHG", "hotelera": true}, {"id": 18, "nombre": "ITC Salamanca", "grupo": "SHG", "hotelera": true}, {"id": 55, "nombre": "ITC Sevilla", "grupo": "SHG", "hotelera": true}, {"id": 80, "nombre": "MD Portomagno", "grupo": "Isakar", "hotelera": true}, {"id": 69, "nombre": "MD Puerto", "grupo": "SHG", "hotelera": true}, {"id": 100, "nombre": "Residencia la15 Triana", "grupo": "Isalcris", "hotelera": true}, {"id": 4, "nombre": "SB Bahía Málaga", "grupo": "SHG", "hotelera": true}, {"id": 17, "nombre": "SB Capuchinos", "grupo": "SHG", "hotelera": true}, {"id": 34, "nombre": "SB Castillo de Santa Catalina", "grupo": "SHG", "hotelera": true}, {"id": 38, "nombre": "SB Columela", "grupo": "SHG", "hotelera": true}, {"id": 19, "nombre": "SB Congreso", "grupo": "SHG", "hotelera": true}, {"id": 93, "nombre": "SB Duques de Medinaceli", "grupo": "SHG", "hotelera": true}, {"id": 87, "nombre": "SB Granada", "grupo": "SHG", "hotelera": true}, {"id": 5, "nombre": "SB Jerez", "grupo": "SHG", "hotelera": true}, {"id": 2, "nombre": "SB Los Naranjos", "grupo": "SHG", "hotelera": true}, {"id": 3, "nombre": "SB Málaga", "grupo": "SHG", "hotelera": true}, {"id": 15, "nombre": "SB Oviedo", "grupo": "SHG", "hotelera": true}, {"id": 20, "nombre": "SB Palacio S. Gabriel", "grupo": "SHG", "hotelera": true}, {"id": 52, "nombre": "SB Palacio de Pombo", "grupo": "SHG", "hotelera": true}, {"id": 37, "nombre": "SB Palillero", "grupo": "SHG", "hotelera": true}, {"id": 9, "nombre": "SB Salamanca", "grupo": "SHG", "hotelera": true}, {"id": 33, "nombre": "SB Urban", "grupo": "SHG", "hotelera": true}, {"id": 7, "nombre": "SB Vistahermosa (44 AT)", "grupo": "SHG", "hotelera": true}, {"id": 71, "nombre": "SB la Harinera", "grupo": "SHG", "hotelera": true}, {"id": 98, "nombre": "Urania Cádiz", "grupo": "SHG", "hotelera": true}]};
+(async function(){
+const D = await SHG.datos("index"); if(!D) return;   // datos desde SharePoint (o local)
 const $ = id => document.getElementById(id);
 const g3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const n0 = x => (x<0?"-":"") + g3(String(Math.round(Math.abs(x))));
@@ -196,6 +198,9 @@ let idActivo = null;        // id de la versión activa
 const gen = {}; CATS.forEach(c=> gen[c.clave]=0);
 let overridesActivos = {};  // ajustes por hotel de la versión abierta (se conservan)
 const hotSel = {}; HOTELES.forEach(h=> hotSel[h.id]=true);   // hoteles incluidos en la versión
+let mesAud = null;   // mes de corte auditoría: null = automático por hotel; 0-12 = corte uniforme
+const MES_NOMBRES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const ANIO_FC = (D.anio || 2027) - 1;   // año en curso (forecast)
 
 function leerVersiones(){ try { return JSON.parse(localStorage.getItem(LS_VS)||"{}"); } catch(e){ return {}; } }
 function guardarVersiones(v){ localStorage.setItem(LS_VS, JSON.stringify(v)); }
@@ -213,6 +218,26 @@ function setHoteles(ids){   // ids incluidos (null = todos)
   HOTELES.forEach(h=> hotSel[h.id] = ids===null ? true : ids.indexOf(h.id)!==-1);
   pintarHoteles();
 }
+// Selector de fecha de auditoría (mes de corte real→ppto del año en curso).
+function pintarMesAud(){
+  const auto = D.mesAuditadoAuto || 0;
+  const etiquetaAuto = auto ? "Automático (último cierre: " + MES_NOMBRES[auto-1] + " " + ANIO_FC + ")"
+                            : "Automático (sin cierres detectados)";
+  let opts = `<option value="">${etiquetaAuto}</option>`
+    + `<option value="0">Sin cierres en ${ANIO_FC} (todo presupuesto)</option>`;
+  for(let i=1;i<=12;i++) opts += `<option value="${i}">${MES_NOMBRES[i-1]} ${ANIO_FC} (real hasta aquí)</option>`;
+  $("mesAud").innerHTML = opts;
+  $("mesAud").value = mesAud===null ? "" : String(mesAud);
+}
+function setMesAud(v){ mesAud = (typeof v==="number") ? v : null;
+  if($("mesAud")) $("mesAud").value = mesAud===null ? "" : String(mesAud); }
+// Forecast del grupo por categoría respetando el corte (para el impacto estimado).
+function grupoForecast(){
+  if(mesAud===null || !D.fcGrupoReal || !D.fcGrupoPpto) return FCG;
+  const out={}; CATS.forEach(c=>{ const r=D.fcGrupoReal[c.clave]||[], p=D.fcGrupoPpto[c.clave]||[];
+    let s=0; for(let m=0;m<12;m++) s += (m<mesAud ? (r[m]||0) : (p[m]||0)); out[c.clave]=s; });
+  return out;
+}
 
 function pintarIncs(){
   const item = c => `<div class="inc ${c.esIngreso?'ing':'gas'}"><span>${c.etiqueta}</span>`
@@ -224,7 +249,8 @@ function pintarIncs(){
 }
 function impacto(){
   let ventas=0, gastos=0, ventasFc=0, gastosFc=0;
-  CATS.forEach(c=>{ const base=FCG[c.clave]||0, f=1+gen[c.clave]/100;
+  const fcg=grupoForecast();
+  CATS.forEach(c=>{ const base=fcg[c.clave]||0, f=1+gen[c.clave]/100;
     if(c.esIngreso){ ventas+=base*f; ventasFc+=base; } else { gastos+=base*f; gastosFc+=base; } });
   return { ventas, gastos, rn:ventas-gastos, rnFc:ventasFc-gastosFc };
 }
@@ -253,12 +279,13 @@ function cargarGeneral(reg){
     const inp=$("g_"+c.clave); if(inp) inp.value=gen[c.clave]; });
   overridesActivos = reg.overrides || {};
   setHoteles(Array.isArray(reg.hoteles) ? reg.hoteles : null);   // null = todos
+  setMesAud(typeof reg.mesAuditado==="number" ? reg.mesAuditado : null);
   pintarKpis();
 }
 function limpiarGeneral(){
   $("nombre").value=""; $("hipotesis").value="";
   CATS.forEach(c=>{ gen[c.clave]=0; const inp=$("g_"+c.clave); if(inp) inp.value=0; });
-  overridesActivos = {}; setHoteles(null); pintarKpis();
+  overridesActivos = {}; setHoteles(null); setMesAud(null); pintarKpis();
 }
 function avisarPendiente(){ if(modo==="activa") $("guardadoAviso").textContent="Cambios sin guardar"; }
 
@@ -293,6 +320,7 @@ function registroDesdeFormulario(prev){
     anio:+$("anio").value, nombre:$("nombre").value.trim(), autor:$("autor").value.trim(),
     hipotesis:$("hipotesis").value.trim(), incrementos,
     hoteles: HOTELES.filter(h=>hotSel[h.id]).map(h=>h.id),   // hoteles incluidos en el presupuesto
+    mesAuditado: mesAud,   // mes de corte real→ppto (null = automático por hotel)
     overrides: prev.overrides || overridesActivos || {},
     creada: prev.creada || new Date().toISOString(),
     modificada: new Date().toISOString(),
@@ -342,10 +370,15 @@ document.querySelectorAll("[data-hall]").forEach(b=> b.addEventListener("click",
   pintarHoteles();
 }));
 
+// Selector de fecha de auditoría: al cambiar, recalcula el impacto estimado.
+$("mesAud").addEventListener("change", ()=>{
+  mesAud = $("mesAud").value==="" ? null : +$("mesAud").value; pintarKpis(); avisarPendiente(); });
+
 // Arranque: si hay versión activa guardada, reanudarla; si no, mostrar el inicio.
-pintarIncs(); pintarHoteles(); pintarKpis(); pintarSelector(); pintarTabs();
+pintarIncs(); pintarHoteles(); pintarMesAud(); pintarKpis(); pintarSelector(); pintarTabs();
 const act = localStorage.getItem(LS_ACT);
 if(act && leerVersiones()[act]) activar(act); else mostrarInicio();
+})();
 </script>
 </body>
 </html>

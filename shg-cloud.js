@@ -6,14 +6,26 @@
   "use strict";
   var C = window.SHG_CONFIG;
 
+  // En localhost la redirección de login vuelve al propio origen (hay que registrar
+  // http://localhost:8000 como URI SPA en Azure); en producción, la de config.js.
+  var _esLocalhost = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
+  var _redirectUri = _esLocalhost ? location.origin : (C.redirectUri || (location.origin + location.pathname));
+
   var msalInstance = new msal.PublicClientApplication({
     auth: {
       clientId: C.clientId,
       authority: "https://login.microsoftonline.com/" + C.tenant,
-      redirectUri: C.redirectUri || (location.origin + location.pathname),
+      redirectUri: _redirectUri,
     },
     cache: { cacheLocation: "localStorage" },
   });
+
+  // ¿Debe activarse la nube/puerta? En producción (github.io) siempre; en local solo
+  // en el puerto 8000 (pruebas con login real); otros puertos/ficheros = modo local.
+  function _modoNube() {
+    if (location.hostname.indexOf("github.io") !== -1) return true;
+    return _esLocalhost && location.port === "8000";
+  }
 
   var _account = null, _siteId = null, _listId = {}, _cols = {};
 
@@ -150,8 +162,9 @@
       var f = it.fields || {}, id = f.Title; if (!id) return;
       _idByTitle[C.listaVersiones][id] = it.id;
       var hlist = null; try { var hj = JSON.parse(f.HotelesJSON || "null"); if (Array.isArray(hj)) hlist = hj; } catch (e) {}
+      var mAud = (f.MesAuditado === "" || f.MesAuditado == null || isNaN(Number(f.MesAuditado))) ? null : Number(f.MesAuditado);
       out[id] = { anio: +(f[fAnio] || 0), nombre: f.Nombre || "", autor: f.Autor || "",
-        hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON), hoteles: hlist,
+        hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON), hoteles: hlist, mesAuditado: mAud,
         overrides: {}, medidas: {}, alojamiento: {}, personal: {}, pptoCat: {},
         creada: f.Creada || "", modificada: f.Modificada || "" };
     });
@@ -201,6 +214,7 @@
         Creada: reg.creada || new Date().toISOString(), Modificada: reg.modificada || new Date().toISOString() };
       fields[fAnio] = Number(reg.anio) || 0;
       if ("HotelesJSON" in cols) fields.HotelesJSON = JSON.stringify(reg.hoteles || []);   // solo si existe la columna
+      if ("MesAuditado" in cols) fields.MesAuditado = (reg.mesAuditado == null ? "" : String(reg.mesAuditado));   // "" = automático
       var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
       if (id) await actualizarItem(C.listaVersiones, id, fields);
       else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
@@ -231,43 +245,163 @@
   // Sincroniza una vez por sesión al abrir cualquier pantalla en GitHub Pages: hace
   // login, descarga las versiones a localStorage y recarga (para que la página se
   // pinte con los datos frescos). En local no hace nada (modo localStorage).
-  async function autoSync() {
-    if (location.hostname.indexOf("github.io") === -1) {         // modo local
+  async function autoSync(pagina) {
+    if (!_modoNube()) {                                          // modo local (sin login ni puerta)
       setTimeout(function () { _estado("modo local (sin SharePoint)", ""); }, 0);
       return;
     }
+    // Puerta de acceso: login corporativo + lista blanca + permiso de página.
+    document.documentElement.style.visibility = "hidden";
+    var ok;
+    try { ok = await puerta(pagina); }
+    catch (e) { console.error("Puerta:", e); _bloquear("No se pudo comprobar el acceso: " + e.message); return; }
+    if (!ok) return;                                             // bloqueado, redirigido o yendo a login
+    document.documentElement.style.visibility = "";
+    _avisarSesion();                                            // las páginas re-filtran por permisos
+
+    // Sincroniza las versiones (metadatos y datos por hotel) a localStorage. Ya no
+    // hace falta recargar: la página se pinta cuando SHG.datos() entrega los datos.
     var primera = !sessionStorage.getItem("shg_synced");
-    if (primera) {
-      // Primera pantalla de la sesión: descarga TODO a localStorage y recarga para
-      // pintar con datos frescos. Solo aquí se sobrescribe el localStorage.
-      document.documentElement.style.visibility = "hidden";
-      try {
-        await init();
-        if (!cuenta()) { login(); return; }                      // redirige a login corporativo
-        await cargarTodo();
-        sessionStorage.setItem("shg_synced", "1");
-        location.reload();
-      } catch (e) {
-        console.error("Nube no disponible:", e);
-        sessionStorage.setItem("shg_synced", "1");
-        _estado("error: " + e.message, "err");
-        document.documentElement.style.visibility = "";
-      }
-      return;
-    }
-    // Pantallas siguientes: NO se descarga de nuevo (para no pisar lo que calcula
-    // cada pantalla). Solo se lee el índice de ítems para poder guardar.
     try {
-      await init();
-      if (!cuenta()) { login(); return; }
-      await cargarIndice();
-      _estado("conectado ✓", "ok");
+      if (primera) { await cargarTodo(); sessionStorage.setItem("shg_synced", "1"); }
+      else { await cargarIndice(); }
+    } catch (e) { console.error("Nube (versiones):", e); }
+
+    // Descarga los datos base de la página desde SharePoint y los entrega a la página.
+    try {
+      var D = await descargarDatosSP(pagina);
+      _entregarDatos(D);
+      _estado("conectado ✓ · " + (sesion() ? sesion().nombre : ""), "ok");
     } catch (e) {
-      console.error("Nube:", e);
+      console.error("Nube (datos):", e);
       _estado("error: " + e.message, "err");
+      _bloquear("No se pudieron cargar los datos: " + e.message);
     }
   }
   function conectado() { return _conectado; }
+
+  // ---- Datos base de cada página (en la nube, o en local desde ./datos) ----
+  var _datosResolve = null;
+  var _datosPromesa = new Promise(function (res) { _datosResolve = res; });
+  function _entregarDatos(D) { if (_datosResolve) { _datosResolve(D); _datosResolve = null; } }
+
+  // Descarga datos/<pagina>.json de la biblioteca Presupuesto_Datos (SharePoint).
+  async function descargarDatosSP(pagina) {
+    var sid = await getSiteId();
+    var dr = await graphCall("/sites/" + sid + "/drives?$select=id,name");
+    var drive = (dr.value || []).filter(function (d) { return d.name === C.listaDatos; })[0];
+    if (!drive) throw new Error("No existe la biblioteca de datos: " + C.listaDatos);
+    var tok = await getToken();
+    var r = await fetch("https://graph.microsoft.com/v1.0/drives/" + drive.id +
+      "/root:/" + pagina + ".json:/content", { headers: { Authorization: "Bearer " + tok } });
+    if (!r.ok) throw new Error("No se pudo descargar " + pagina + ".json (" + r.status + ")");
+    return r.json();
+  }
+
+  // La usa cada página: devuelve los datos base. En local, del fichero local; en la
+  // nube, los entrega autoSync tras la puerta y la descarga.
+  function datos(pagina) {
+    if (!_modoNube()) {
+      return fetch("datos/" + pagina + ".json").then(function (r) {
+        if (!r.ok) throw new Error("No se encontró datos/" + pagina + ".json"); return r.json();
+      });
+    }
+    return _datosPromesa;
+  }
+
+  // ---- Permisos de usuario (lista blanca Presupuesto_Usuarios) ----
+  var _sesion = null;              // permisos resueltos del usuario logueado
+  var PAGINAS_TODAS = "todas";
+
+  function _emailCuenta() {
+    var a = _account || (msalInstance.getAllAccounts()[0]);
+    return ((a && (a.username || a.name)) || "").toLowerCase();
+  }
+  function _partes(v) {
+    return String(v == null ? "" : v).split(/[;,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function _esVerdadero(v) {        // columna Sí/No: llega como true/false, "1"/"0", "Sí"/"No"
+    if (v === true) return true;
+    if (v === false || v == null) return false;
+    var s = String(v).toLowerCase();
+    return s === "1" || s === "true" || s === "sí" || s === "si" || s === "yes";
+  }
+
+  // Lee Presupuesto_Usuarios y resuelve los permisos del usuario actual (se cachea).
+  async function cargarSesion() {
+    if (_sesion) return _sesion;
+    var email = _emailCuenta();
+    var fila = null;
+    try {
+      var items = await leerItems(C.listaUsuarios);
+      items.forEach(function (it) {
+        var f = it.fields || {};
+        if (String(f.Title || "").trim().toLowerCase() === email) fila = f;
+      });
+    } catch (e) { console.error("No se pudo leer la lista de usuarios:", e); }
+    if (!fila) { _sesion = { email: email, autorizado: false }; return _sesion; }
+    var pag = String(fila.Paginas || "todas").toLowerCase();
+    _sesion = {
+      email: email,
+      nombre: fila.Nombre || email,
+      autorizado: _esVerdadero(fila.Activo === undefined ? true : fila.Activo),
+      ambito: String(fila.Ambito || "todos").toLowerCase(),   // todos | zona | hoteles
+      zonas: _partes(fila.Zonas).map(function (z) { return z.toLowerCase(); }),
+      hoteles: _partes(fila.Hoteles).map(Number).filter(function (n) { return !isNaN(n); }),
+      paginas: pag.indexOf("todas") >= 0 ? PAGINAS_TODAS : _partes(pag),
+    };
+    return _sesion;
+  }
+  function sesion() { return _sesion; }
+  // Avisa a las páginas de que ya se conocen los permisos, para que re-filtren/re-render.
+  function _avisarSesion() { try { window.dispatchEvent(new Event("shg:sesion")); } catch (e) {} }
+
+  function paginaPermitida(pagina) {
+    if (!_sesion || !_sesion.autorizado) return false;
+    return _sesion.paginas === PAGINAS_TODAS || _sesion.paginas.indexOf(pagina) >= 0;
+  }
+  // ¿El usuario puede ver este hotel? (idZona/nombreZona para el ámbito por zona)
+  function hotelPermitido(idHotel, idZona, nombreZona) {
+    var s = _sesion; if (!s || !s.autorizado) return false;
+    if (s.ambito === "todos") return true;
+    if (s.ambito === "hoteles") return s.hoteles.indexOf(Number(idHotel)) >= 0;
+    if (s.ambito === "zona") {
+      return s.zonas.indexOf(String(idZona).toLowerCase()) >= 0
+          || s.zonas.indexOf(String(nombreZona || "").toLowerCase()) >= 0;
+    }
+    return false;
+  }
+
+  // Overlay de bloqueo a pantalla completa.
+  function _bloquear(mensaje) {
+    document.documentElement.style.visibility = "";
+    var d = document.createElement("div");
+    d.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;"
+      + "background:#0f141b;color:#e7ecf3;font-family:'Segoe UI',system-ui,sans-serif;text-align:center;padding:24px";
+    d.innerHTML = "<div><div style='font-size:40px;margin-bottom:12px'>🔒</div>"
+      + "<div style='font-size:16px;max-width:440px;line-height:1.5'>" + mensaje + "</div>"
+      + "<div style='margin-top:16px'><button id='shgSalir' style='font:inherit;padding:8px 16px;border-radius:8px;"
+      + "border:1px solid #26303d;background:#161c26;color:#e7ecf3;cursor:pointer'>Cerrar sesión</button></div></div>";
+    document.body.appendChild(d);
+    var b = document.getElementById("shgSalir"); if (b) b.addEventListener("click", function () { logout(); });
+  }
+
+  // Puerta de acceso: login + lista blanca + permiso de página. Devuelve true si pasa.
+  async function puerta(paginaActual) {
+    await init();
+    if (!cuenta()) { login(); return false; }
+    var s = await cargarSesion();
+    if (!s.autorizado) {
+      _bloquear("Tu cuenta (" + s.email + ") no tiene acceso a esta aplicación. Contacta con el administrador.");
+      return false;
+    }
+    if (paginaActual && !paginaPermitida(paginaActual)) {
+      var destino = (s.paginas !== PAGINAS_TODAS && s.paginas[0]) || null;
+      if (destino && destino !== paginaActual) { location.href = destino + ".html"; return false; }
+      _bloquear("No tienes acceso a esta sección."); return false;
+    }
+    return true;
+  }
 
   window.SHG = {
     init: init, login: login, logout: logout, cuenta: cuenta,
@@ -276,5 +410,8 @@
     leerItems: leerItems, crearItem: crearItem, actualizarItem: actualizarItem, borrarItem: borrarItem,
     cargarTodo: cargarTodo, pushVersion: pushVersion, pushHotel: pushHotel,
     autoSync: autoSync, conectado: conectado,
+    cargarSesion: cargarSesion, sesion: sesion, puerta: puerta,
+    paginaPermitida: paginaPermitida, hotelPermitido: hotelPermitido,
+    datos: datos,
   };
 })();

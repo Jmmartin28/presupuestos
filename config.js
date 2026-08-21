@@ -11,4 +11,6 @@ window.SHG_CONFIG = {
   site:         "sohohoteles.sharepoint.com:/sites/controldegestion:",
   listaVersiones: "Presupuesto_Versiones",
   listaHoteles:   "Presupuesto_Version_Hoteles",
+  listaUsuarios:  "Presupuesto_Usuarios",   // lista blanca de acceso + permisos por usuario
+  listaDatos:     "Presupuesto_Datos",      // datos base por hotel (Fase B: se cargan tras login)
 };
