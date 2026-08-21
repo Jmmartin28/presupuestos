@@ -58,7 +58,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=6"></script><script src="shg-cloud.js?v=6"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("por_partida");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=7"></script><script src="shg-cloud.js?v=7"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("por_partida");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -178,6 +178,22 @@ function fcCatDe(h){
     for(let m=0;m<12;m++) out[cat][m]+= sg*s[m]; });
   h._fcCatN=N; return h._fcCat=out;
 }
+// --- Ingreso de Management Fees de la Central (intragrupo): Ppto = Σ MF de hoteleras ---
+const NODO_MF_ING = ((D.catNodos||[]).find(c=>c.clave==="mf_ing")||{}).nodo;
+function catPptoMesPP(h, cat){   // Ppto mensual de una categoría de un hotel
+  const v=activeVersion(), pc=v&&v.pptoCat&&v.pptoCat[h.id];
+  if(pc && Array.isArray(pc[cat])) return pc[cat];
+  const fcc=fcCatDe(h), inc=1+incFrac(cat,h.id);
+  return (fcc[cat]||Z()).map(x=> x*inc);
+}
+function mfCentralManualMes(){ const v=activeVersion(); const a=v&&v.centralMf;
+  return Array.isArray(a)&&a.length===12 ? a.map(x=>+x||0) : null; }
+function mfCentralPptoMes(){
+  const man=mfCentralManualMes(); if(man) return man;
+  const acc=Z(); D.hoteles.forEach(h=>{ if(h.hotelera && !h.esCentral && hotelIncluido(h.id)){
+    const s=catPptoMesPP(h,"management_fees"); for(let m=0;m<12;m++) acc[m]+= s[m]||0; } });
+  return acc;
+}
 function serie(h, key){                    // 12 meses de la partida para un hotel
   const ids = subarbol(nodo), src = (key==="ppto"||key==="fc") ? fcNodo(h) : h[key], esPpto = key==="ppto", acc = Z();
   const v = esPpto ? activeVersion() : null;
@@ -195,6 +211,10 @@ function serie(h, key){                    // 12 meses de la partida para un hot
       acc[m] += s[m]*f;
     }
   });
+  // Central: en el Ppto, el ingreso de Management Fees = Σ MF (coste) de hoteleras.
+  if(esPpto && h.esCentral && NODO_MF_ING!=null && ids.indexOf(NODO_MF_ING)>=0){
+    const mf=mfCentralPptoMes(); for(let m=0;m<12;m++) acc[m] += -mf[m];   // signo raw (ingreso negativo antes del flip)
+  }
   if(ING.has(nodo)) for(let m=0;m<12;m++) acc[m] = -acc[m];   // ingresos en positivo
   return acc;
 }

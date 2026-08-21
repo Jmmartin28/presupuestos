@@ -68,7 +68,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=6"></script><script src="shg-cloud.js?v=6"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("consolidado");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=7"></script><script src="shg-cloud.js?v=7"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("consolidado");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -166,10 +166,25 @@ function ocuCorte(h, concepto){
   const r=h.ocuReal[concepto]||Z(), p=h.ocuPpto[concepto]||Z();
   return M.map((_,m)=> m<N ? r[m] : p[m]);
 }
-function buildFilas(h){
+// Ppto mensual por categoría de una entidad (con el override de la Central en MF).
+function cvMes(h){
   const v=activeVersion(), pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto mensual detallado de la hoja de trabajo
   const cm=catMesCorte(h);
   const cv={}; D.catClaves.forEach(k=> cv[k]= (pc && Array.isArray(pc[k])) ? pc[k].slice() : (cm[k]||Z()).map(x=> x*(1+incFrac(k,h.id))));
+  if(h.esCentral) cv.mf_ing = mfCentralPptoMes();   // ingreso MF de la Central = Σ MF (coste) de hoteleras
+  return cv;
+}
+// Suma mensual del coste de Management Fees (Ppto) de las hoteleras incluidas.
+function mfCentralPptoMes(){
+  const man = mfCentralManualMes(); if(man) return man;
+  const acc=Z(); D.hoteles.forEach(h=>{ if(h.hotelera && !h.esCentral && hotelIncluido(h.id)){
+    const c=cvMes(h); for(let m=0;m<12;m++) acc[m] += (c.management_fees && c.management_fees[m]) || 0; } });
+  return acc;
+}
+function mfCentralManualMes(){ const v=activeVersion(); const a=v&&v.centralMf;
+  return Array.isArray(a)&&a.length===12 ? a.map(x=>+x||0) : null; }
+function buildFilas(h){
+  const cv = cvMes(h);
   const sumc = list => list.reduce((acc,k)=> acc.map((v,i)=>v+cv[k][i]), Z());
   const tI=sumc(D.catIngresos), tG=sumc(D.catOperativos), gop=tI.map((v,i)=>v-tG[i]);
   const mf=cv.management_fees, alq=cv.arrendamientos, onp=cv.otros_no_op, soc=cv.societarios;

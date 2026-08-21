@@ -63,7 +63,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=6"></script><script src="shg-cloud.js?v=6"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("analisis");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=7"></script><script src="shg-cloud.js?v=7"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("analisis");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -174,9 +174,18 @@ function metricasDeCat(cat){
 }
 function catPpto(h){
   const v=activeVersion(), pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto detallado de la hoja de trabajo
-  if(pc){ const out={}; D.catClaves.forEach(k=> out[k]= Array.isArray(pc[k]) ? pc[k].reduce((a,x)=>a+x,0) : 0); return out; }
-  const fc=catForecast(h); const out={}; D.catClaves.forEach(k=> out[k]=(fc[k]||0)*(1+incFrac(k,h.id))); return out;
+  let out;
+  if(pc){ out={}; D.catClaves.forEach(k=> out[k]= Array.isArray(pc[k]) ? pc[k].reduce((a,x)=>a+x,0) : 0); }
+  else { const fc=catForecast(h); out={}; D.catClaves.forEach(k=> out[k]=(fc[k]||0)*(1+incFrac(k,h.id))); }
+  if(h.esCentral) out.mf_ing = mfCentralPpto();   // ingreso MF de la Central = Σ MF (coste) de hoteleras
+  return out;
 }
+function mfCentralPpto(){
+  const man = mfCentralManual(); if(man!=null) return man;
+  let s=0; D.hoteles.forEach(h=>{ if(h.hotelera && !h.esCentral && hotelIncluido(h.id)) s += (catPpto(h).management_fees||0); }); return s;
+}
+function mfCentralManual(){ const v=activeVersion(); const a=v&&v.centralMf;
+  return Array.isArray(a)&&a.length===12 ? a.reduce((x,y)=>x+(+y||0),0) : null; }
 HOT.forEach(h=> h.m = { ppto:metricasDeCat(catPpto(h)), fc:metricasDeCat(catForecast(h)), prev:metricasDeCat(h.catPrev) });
 
 // Ámbito: filtra los hoteles incluidos (mismo informe, sin subtotales nuevos).

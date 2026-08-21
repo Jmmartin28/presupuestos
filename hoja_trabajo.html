@@ -103,7 +103,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=6"></script><script src="shg-cloud.js?v=6"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=7"></script><script src="shg-cloud.js?v=7"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -236,6 +236,20 @@ function incPct(cat){                       // % de incremento de una categoría
   const f=(cat in o) ? o[cat] : (v.incrementos ? v.incrementos[cat] : 0);
   return (f||0)*100;
 }
+// --- Central (SHG): ingreso MF (Ppto) = Σ del coste de MF de las hoteleras ---
+function esCentralActual(){ const h=D.hoteles.find(x=>x.id===D.idHotel); return !!(h && h.esCentral); }
+function _incFracHotel(cat, hotelId){ const v=activeVersion(); if(!v||!cat) return 0;
+  const o=(v.overrides&&v.overrides[hotelId])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
+function _mgmtFeesFcMes(hotelId){ const dv=D.porHotel[hotelId]; if(!dv) return Z();
+  const g=(dv.grupos||[]).find(g=>g.catClave==="management_fees"); if(!g) return Z();
+  const acc=Z(); (g.detalle||[]).forEach(d=>{ const fm=d.fcMes||[]; for(let m=0;m<12;m++) acc[m]+=fm[m]||0; }); return acc; }
+function _mgmtFeesPptoMes(hotelId){ const v=activeVersion(), pc=v&&v.pptoCat&&v.pptoCat[hotelId];
+  if(pc && Array.isArray(pc.management_fees)) return pc.management_fees;
+  const inc=1+_incFracHotel("management_fees",hotelId); return _mgmtFeesFcMes(hotelId).map(x=>x*inc); }
+function mfCentralManualMes(){ const v=activeVersion(); const a=v&&v.centralMf; return Array.isArray(a)&&a.length===12?a.map(x=>+x||0):null; }
+function mfCentralPptoMes(){ const man=mfCentralManualMes(); if(man) return man;
+  const acc=Z(); D.hoteles.forEach(h=>{ if(h.hotelera && !h.esCentral && _incluidoVer(h.id)){
+    const s=_mgmtFeesPptoMes(h.id); for(let m=0;m<12;m++) acc[m]+=s[m]||0; } }); return acc; }
 // Ingresos de Alojamiento publicados por su página (ventas = ocupación×ADR).
 function alojPaginaMes(){
   const v=activeVersion(); if(!v) return null;
@@ -310,6 +324,12 @@ function recompute() {
     }));
     c.ventasTot=vt; c.ventasAloj=va.some(x=>x)?va:D.drivers.alojMes; c.ventasFb=vf;
     D.grupos.forEach(g=>{ g._m=Z(); g.detalle.forEach(d=>{ d._m=calcDetalle(d,g,c); d._m.forEach((v,i)=>g._m[i]+=v); }); });
+    // Central: el ingreso de Management Fees (Ppto) = Σ MF de las hoteleras (intragrupo).
+    if(esCentralActual()){ const gmf=D.grupos.find(g=>g.catClave==="mf_ing");
+      if(gmf){ const mf=mfCentralPptoMes(); gmf._m=mf.slice();
+        gmf.detalle.forEach((d,di)=> d._m = di===0 ? mf.slice() : Z());   // el intragrupo va en la 1ª partida
+        let vt2=Z(); D.grupos.filter(g=>g.seccion==="ing").forEach(g=>g.detalle.forEach(d=>d._m.forEach((v,i)=>vt2[i]+=v)));
+        c.ventasTot=vt2; } }
     c.refs={}; D.grupos.forEach(g=>g.detalle.forEach(d=>{ c.refs[norm(d.nombre)]=sum(d._m); }));
     const w=waterfall(g=>g._m);
     c.refs["ingresos"]=c.refs["total ingresos"]=sum(w.ing);

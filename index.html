@@ -87,8 +87,8 @@
 </head>
 <body>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-  <script src="config.js?v=6"></script>
-  <script src="shg-cloud.js?v=6"></script>
+  <script src="config.js?v=7"></script>
+  <script src="shg-cloud.js?v=7"></script>
   <script>window.SHG && SHG.autoSync && SHG.autoSync("index");</script>
   <span class="ab-nube" id="abNube">Nube: comprobando…</span>
   <div class="wrap">
@@ -148,6 +148,13 @@
 
       <h2>Incrementos generales por categoría (sobre el forecast, se aplican a todos los hoteles)</h2>
       <div class="incs" id="incs"></div>
+
+      <h2>Ingresos Management Fees de la Central (intragrupo)</h2>
+      <div class="row" style="margin:-2px 0 8px; gap:10px; align-items:center">
+        <label class="inc" style="cursor:pointer; flex:none"><input type="checkbox" id="centralManualChk"> <span>Introducir importes manualmente</span></label>
+        <span class="vmeta">Si se deja sin marcar, el Ppto de la Central = Σ del coste de MF de las hoteleras.</span>
+      </div>
+      <div class="incs" id="centralMfBox" style="display:none"></div>
 
       <h2>Impacto estimado sobre el grupo</h2>
       <div class="kpis" id="kpis"></div>
@@ -231,6 +238,27 @@ function pintarMesAud(){
 }
 function setMesAud(v){ mesAud = (typeof v==="number") ? v : null;
   if($("mesAud")) $("mesAud").value = mesAud===null ? "" : String(mesAud); }
+
+// Override manual del ingreso MF de la Central (12 meses). null = automático (Σ MF hoteleras).
+let centralMf = null;
+const MESES_CORTO = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const numMf = s => { const v=parseFloat(String(s).replace(/\./g,"").replace(",",".")); return isNaN(v)?0:v; };
+function pintarCentralMf(){
+  const manual = $("centralManualChk").checked;
+  $("centralMfBox").style.display = manual ? "" : "none";
+  if(!manual){ $("centralMfBox").innerHTML=""; return; }
+  const v = Array.isArray(centralMf) ? centralMf : new Array(12).fill(0);
+  $("centralMfBox").innerHTML = v.map((x,i)=>`<div class="inc ing"><span>${MESES_CORTO[i]}</span>`
+    + `<input type="text" data-mm="${i}" value="${x?n0(x):""}" style="width:90px;text-align:right"></div>`).join("");
+  $("centralMfBox").querySelectorAll("input").forEach(inp=> inp.addEventListener("input", ()=>{
+    if(!Array.isArray(centralMf)) centralMf = new Array(12).fill(0);
+    centralMf[+inp.dataset.mm] = numMf(inp.value); avisarPendiente(); }));
+}
+function setCentralMf(arr){
+  centralMf = (Array.isArray(arr) && arr.length===12) ? arr.map(x=>+x||0) : null;
+  $("centralManualChk").checked = centralMf!==null;
+  pintarCentralMf();
+}
 // Forecast del grupo por categoría respetando el corte (para el impacto estimado).
 function grupoForecast(){
   if(mesAud===null || !D.fcGrupoReal || !D.fcGrupoPpto) return FCG;
@@ -280,12 +308,13 @@ function cargarGeneral(reg){
   overridesActivos = reg.overrides || {};
   setHoteles(Array.isArray(reg.hoteles) ? reg.hoteles : null);   // null = todos
   setMesAud(typeof reg.mesAuditado==="number" ? reg.mesAuditado : null);
+  setCentralMf(reg.centralMf);
   pintarKpis();
 }
 function limpiarGeneral(){
   $("nombre").value=""; $("hipotesis").value="";
   CATS.forEach(c=>{ gen[c.clave]=0; const inp=$("g_"+c.clave); if(inp) inp.value=0; });
-  overridesActivos = {}; setHoteles(null); setMesAud(null); pintarKpis();
+  overridesActivos = {}; setHoteles(null); setMesAud(null); setCentralMf(null); pintarKpis();
 }
 function avisarPendiente(){ if(modo==="activa") $("guardadoAviso").textContent="Cambios sin guardar"; }
 
@@ -321,6 +350,7 @@ function registroDesdeFormulario(prev){
     hipotesis:$("hipotesis").value.trim(), incrementos,
     hoteles: HOTELES.filter(h=>hotSel[h.id]).map(h=>h.id),   // hoteles incluidos en el presupuesto
     mesAuditado: mesAud,   // mes de corte real→ppto (null = automático por hotel)
+    centralMf: $("centralManualChk").checked ? (Array.isArray(centralMf)?centralMf:new Array(12).fill(0)) : null,
     overrides: prev.overrides || overridesActivos || {},
     creada: prev.creada || new Date().toISOString(),
     modificada: new Date().toISOString(),
@@ -373,9 +403,11 @@ document.querySelectorAll("[data-hall]").forEach(b=> b.addEventListener("click",
 // Selector de fecha de auditoría: al cambiar, recalcula el impacto estimado.
 $("mesAud").addEventListener("change", ()=>{
   mesAud = $("mesAud").value==="" ? null : +$("mesAud").value; pintarKpis(); avisarPendiente(); });
+// Override manual de los ingresos MF de la Central.
+$("centralManualChk").addEventListener("change", ()=>{ if(!$("centralManualChk").checked) centralMf=null; pintarCentralMf(); avisarPendiente(); });
 
 // Arranque: si hay versión activa guardada, reanudarla; si no, mostrar el inicio.
-pintarIncs(); pintarHoteles(); pintarMesAud(); pintarKpis(); pintarSelector(); pintarTabs();
+pintarIncs(); pintarHoteles(); pintarMesAud(); pintarCentralMf(); pintarKpis(); pintarSelector(); pintarTabs();
 const act = localStorage.getItem(LS_ACT);
 if(act && leerVersiones()[act]) activar(act); else mostrarInicio();
 })();
