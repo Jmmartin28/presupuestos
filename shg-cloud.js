@@ -291,21 +291,19 @@
   function _entregarDatos(D) { if (_datosResolve) { _datosResolve(D); _datosResolve = null; } }
 
   // Descarga datos/<pagina>.json de la biblioteca Presupuesto_Datos (SharePoint).
-  // Cachea en sessionStorage para que volver a una página ya vista sea instantáneo.
+  // Se pide siempre fresco (sin caché): al republicar datos, la app los ve al instante.
   async function descargarDatosSP(pagina) {
-    var ck = "shg_datos_" + pagina;
-    try { var c = sessionStorage.getItem(ck); if (c) return JSON.parse(c); } catch (e) {}
     var sid = await getSiteId();
     var dr = await graphCall("/sites/" + sid + "/drives?$select=id,name");
     var drive = (dr.value || []).filter(function (d) { return d.name === C.listaDatos; })[0];
     if (!drive) throw new Error("No existe la biblioteca de datos: " + C.listaDatos);
     var tok = await getToken();
+    // cache-buster para saltar cachés intermedias del navegador/proxy.
     var r = await fetch("https://graph.microsoft.com/v1.0/drives/" + drive.id +
-      "/root:/" + pagina + ".json:/content", { headers: { Authorization: "Bearer " + tok } });
+      "/root:/" + pagina + ".json:/content?t=" + Date.now(),
+      { headers: { Authorization: "Bearer " + tok }, cache: "no-store" });
     if (!r.ok) throw new Error("No se pudo descargar " + pagina + ".json (" + r.status + ")");
-    var txt = await r.text();
-    try { sessionStorage.setItem(ck, txt); } catch (e) {}   // puede fallar si es muy grande; da igual
-    return JSON.parse(txt);
+    return r.json();
   }
 
   // La usa cada página: devuelve los datos base. En local, del fichero local; en la
