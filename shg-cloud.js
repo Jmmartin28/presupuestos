@@ -244,6 +244,27 @@
     } catch (e) { console.error("Error guardando el hotel en SharePoint:", e); _estado("⚠ NO guardado: " + e.message, "err"); }
   }
 
+  // Borra una versión por completo en SharePoint: su fila de metadatos y TODAS sus
+  // filas por hotel. En modo local (sin SharePoint) no hace nada; el borrado local lo
+  // realiza la pantalla de Inicio. En nube requiere conexión (si no, no se puede borrar
+  // en remoto y volvería a aparecer en la siguiente sincronización).
+  async function deleteVersion(versionId) {
+    if (!_modoNube()) return;
+    if (!_conectado) throw new Error("Sin conexión con SharePoint; reinténtalo cuando termine de cargar.");
+    if (!_idByTitle[C.listaVersiones] || !_idByTitle[C.listaHoteles]) await cargarIndice();
+    var vid = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
+    if (vid) { await borrarItem(C.listaVersiones, vid); delete _idByTitle[C.listaVersiones][versionId]; }
+    var mapH = _idByTitle[C.listaHoteles] || {}, prefijo = versionId + "_";
+    var titulos = Object.keys(mapH).filter(function (t) {
+      return t.indexOf(prefijo) === 0 && /^\d+$/.test(t.slice(prefijo.length));   // versionId_<idHotel>
+    });
+    for (var i = 0; i < titulos.length; i++) {
+      await borrarItem(C.listaHoteles, mapH[titulos[i]]);
+      delete mapH[titulos[i]];
+    }
+    _estado("versión borrada ✓ " + new Date().toLocaleTimeString(), "ok");
+  }
+
   // Sincroniza una vez por sesión al abrir cualquier pantalla en GitHub Pages: hace
   // login, descarga las versiones a localStorage y recarga (para que la página se
   // pinte con los datos frescos). En local no hace nada (modo localStorage).
@@ -431,7 +452,7 @@
     graphCall: graphCall, getSiteId: getSiteId, getListId: getListId,
     getCols: getCols, interno: interno,
     leerItems: leerItems, crearItem: crearItem, actualizarItem: actualizarItem, borrarItem: borrarItem,
-    cargarTodo: cargarTodo, pushVersion: pushVersion, pushHotel: pushHotel,
+    cargarTodo: cargarTodo, pushVersion: pushVersion, pushHotel: pushHotel, deleteVersion: deleteVersion,
     autoSync: autoSync, conectado: conectado,
     cargarSesion: cargarSesion, sesion: sesion, puerta: puerta,
     paginaPermitida: paginaPermitida, hotelPermitido: hotelPermitido,

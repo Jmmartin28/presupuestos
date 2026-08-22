@@ -88,8 +88,8 @@
 </head>
 <body>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-  <script src="config.js?v=8"></script>
-  <script src="shg-cloud.js?v=8"></script>
+  <script src="config.js?v=9"></script>
+  <script src="shg-cloud.js?v=9"></script>
   <script>window.SHG && SHG.autoSync && SHG.autoSync("index");</script>
   <span class="ab-nube" id="abNube">Nube: comprobando…</span>
   <div class="wrap">
@@ -111,6 +111,7 @@
           <div class="row" style="gap:8px">
             <select id="selVer"><option value="">Selecciona una versión…</option></select>
             <button class="btn gas" id="btnAbrir" disabled>Abrir</button>
+            <button class="btn" id="btnBorrar" disabled title="Borra la versión (metadatos y ajustes por hotel). No se puede deshacer.">🗑 Borrar</button>
           </div>
         </div>
       </div>
@@ -313,8 +314,20 @@ function activar(id){
 
 $("btnNueva").addEventListener("click", ()=>{ modo="nueva"; limpiarGeneral(); $("anio").value=D.anio;
   $("barra").classList.add("hidden"); mostrarForm("Nueva versión", "Crear versión"); $("nombre").focus(); });
-$("selVer").addEventListener("change", ()=> $("btnAbrir").disabled = !$("selVer").value);
+$("selVer").addEventListener("change", ()=>{ const v=!$("selVer").value; $("btnAbrir").disabled=v; $("btnBorrar").disabled=v; });
 $("btnAbrir").addEventListener("click", ()=>{ const id=$("selVer").value; if(id) activar(id); });
+$("btnBorrar").addEventListener("click", async ()=>{
+  const id=$("selVer").value; if(!id) return;
+  const vs=leerVersiones(), reg=vs[id]; if(!reg) return;
+  if(!confirm(`¿Borrar la versión "${reg.nombre}" (${reg.anio})?\n\nSe eliminarán sus metadatos y todos los ajustes por hotel. Esta acción no se puede deshacer.`)) return;
+  $("btnBorrar").disabled=true; $("btnAbrir").disabled=true;
+  try {
+    if(window.SHG && SHG.deleteVersion) await SHG.deleteVersion(id);   // borra en SharePoint (nube)
+    delete vs[id]; guardarVersiones(vs);
+    if(idActivo===id) mostrarInicio();
+    pintarSelector(); $("selVer").value="";
+  } catch(e){ alert("No se pudo borrar la versión en SharePoint: "+((e&&e.message)||e)); }
+});
 $("btnCambiar").addEventListener("click", mostrarInicio);
 
 // Mezcla los datos generales del formulario sobre el registro previo, CONSERVANDO

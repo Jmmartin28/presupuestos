@@ -42,6 +42,22 @@
   .btn:disabled { opacity:.45; cursor:not-allowed; }
   .btn.on { color:var(--ing); border-color:var(--ing); background:var(--ing-bg); }
   .btn.nav { color:var(--res); border-color:var(--res); }
+  .btn.danger { color:var(--neg); border-color:var(--neg); }
+  .btn.danger:hover { background:rgba(192,57,43,.08); }
+  /* Panel plegable de incrementos por categoría (solo del hotel activo). */
+  .incpanel { display:none; margin:0 0 10px; padding:12px 14px; border:1px solid var(--line);
+    border-radius:10px; background:var(--panel); box-shadow:var(--shadow); }
+  .incpanel.open { display:block; }
+  .incpanel .ip-h { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin:0 0 8px; }
+  .incgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px 14px; }
+  .incgrp { grid-column:1/-1; font-size:11px; font-weight:700; letter-spacing:.04em; }
+  .incgrp.ing { color:var(--ing); } .incgrp.gas { color:var(--gas); margin-top:4px; }
+  .incrow { display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:6px 10px; border-radius:8px; border:1px solid var(--line); }
+  .incrow.ing { background:var(--ing-bg); } .incrow.gas { background:var(--gas-bg); }
+  .incrow span { font-size:12px; } .incrow input { width:74px; text-align:right; font:inherit;
+    font-size:12.5px; padding:4px 6px; border:1px solid var(--line); border-radius:7px;
+    background:var(--panel); color:var(--ink); }
   .savedHint { font-size:11.5px; color:var(--res); align-self:center; transition:opacity .4s; }
   .sep { width:1px; align-self:stretch; background:var(--line); margin:0 2px; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
@@ -103,7 +119,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=8"></script><script src="shg-cloud.js?v=8"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=9"></script><script src="shg-cloud.js?v=9"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -158,11 +174,14 @@
     <div class="controls">
       <div class="ctl"><label>Hotel (trabajando)</label><select id="selHotel"></select></div>
       <button class="btn" id="toggleAll">Desplegar partidas</button>
+      <button class="btn" id="btnIncr" title="Incrementa las partidas solo de este hotel">Incrementos del hotel ▾</button>
+      <button class="btn danger" id="btnLimpiar" title="Borra medidas e incrementos de este hotel (base del forecast)">Limpiar datos</button>
       <span id="savedHint" class="savedHint"></span>
       <div class="ctl" style="margin-left:auto"><label>Referencia de medidas</label><select id="refBase"><option value="fc">Forecast</option><option value="prev">Año anterior</option></select></div>
       <div class="ctl"><label>Clonar medidas de otro hotel</label>
         <div style="display:flex; gap:6px"><select id="cloneHotel"></select><button class="btn" id="cloneBtn" disabled>Clonar</button></div></div>
     </div>
+    <div class="incpanel" id="incPanel"></div>
     <div class="vinc" id="vinc"></div>
     <div class="card"><table id="t"><thead><tr id="cab"></tr></thead><tbody id="cuerpo"></tbody></table></div>
     <footer>App de Presupuestos SHG · el alojamiento y el personal se calculan en sus páginas · edita un mes del Ppto para fijarlo manualmente</footer>
@@ -495,6 +514,63 @@ function pintarVinc(){
     return `<span class="chip ${g.ingreso?'ing':'gas'}" title="${g.nombre}">${g.nombre} ${fmt(p)}</span>`; }).filter(Boolean).join("");
   cont.innerHTML=`<span class="vlbl">Incrementos · ${v.nombre}</span>` + (chips || '<span class="chip">todos 0% · Ppto = forecast</span>');
 }
+
+// ---- Incrementos por categoría SOLO del hotel activo (panel plegable) ----
+// Guardan un override por hotel (v.overrides[hotel][cat]) que prevalece sobre el
+// incremento general de la versión; se reflejan en los chips de arriba (pintarVinc).
+function _setOverrideHotel(cat, frac){
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+  const act=localStorage.getItem("shg_version_activa"); if(!act||!vs[act]) return;
+  vs[act].overrides = vs[act].overrides || {};
+  vs[act].overrides[D.idHotel] = vs[act].overrides[D.idHotel] || {};
+  vs[act].overrides[D.idHotel][cat] = frac;
+  vs[act].modificada = new Date().toISOString();
+  localStorage.setItem("shg_versiones", JSON.stringify(vs));
+  if(window.SHG) SHG.pushHotel(act, D.idHotel);   // guardar en SharePoint
+}
+function pintarIncPanel(){
+  const cont=$("incPanel"), v=activeVersion();
+  if(!v){ cont.innerHTML='<div class="ip-h">Abre o crea una versión activa (en Inicio) para configurar incrementos.</div>'; return; }
+  const fmtv=x=> Math.round(x*10)/10;   // incPct ya viene en % (fracción×100)
+  const row=g=>`<label class="incrow ${g.ingreso?'ing':'gas'}"><span>${g.nombre}</span>`
+    + `<span><input type="number" step="0.5" data-inc="${g.catClave}" value="${fmtv(incPct(g.catClave))}"> %</span></label>`;
+  const ing=D.grupos.filter(g=>g.ingreso && g.catClave), gas=D.grupos.filter(g=>!g.ingreso && g.catClave);
+  cont.innerHTML=`<div class="ip-h">Incrementos sobre el forecast · solo ${D.porHotel[D.idHotel].nombre}</div>`
+    + '<div class="incgrid"><div class="incgrp ing">Ingresos</div>' + ing.map(row).join("")
+    + '<div class="incgrp gas">Gastos</div>' + gas.map(row).join("") + '</div>';
+  cont.querySelectorAll('input[data-inc]').forEach(inp=> inp.addEventListener("input", ()=>{
+    _setOverrideHotel(inp.dataset.inc, (parseFloat(inp.value)||0)/100);
+    pintarVinc(); recompute(); marcarGuardado();
+  }));
+}
+$("btnIncr").addEventListener("click", ()=>{
+  const p=$("incPanel"), abrir=p.classList.toggle("open");
+  $("btnIncr").classList.toggle("on", abrir);
+  $("btnIncr").textContent = "Incrementos del hotel " + (abrir ? "▴" : "▾");
+  if(abrir) pintarIncPanel();
+});
+// Limpiar TODOS los datos del hotel activo (medidas + incrementos) → base del forecast.
+$("btnLimpiar").addEventListener("click", ()=>{
+  const v=activeVersion();
+  if(!v){ marcarGuardado("Sin versión activa: no se guarda"); return; }
+  const nom = D.porHotel[D.idHotel].nombre;
+  if(!confirm(`¿Seguro que quieres limpiar TODOS los datos de "${nom}"?\n\n`
+    + `Se borran las medidas por partida y los incrementos de este hotel, dejándolo en `
+    + `la base del forecast. Solo afecta a este hotel y no se puede deshacer.`)) return;
+  aplicarMedidas({});                                   // vacía medidas (inputs + estado)
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
+  const act=localStorage.getItem("shg_version_activa");
+  if(act&&vs[act]){
+    const ceros={}; D.grupos.forEach(g=>{ if(g.catClave) ceros[g.catClave]=0; });
+    vs[act].overrides = vs[act].overrides || {}; vs[act].overrides[D.idHotel]=ceros;   // 0% (ignora el general)
+    vs[act].medidas   = vs[act].medidas   || {}; vs[act].medidas[D.idHotel]={};
+    vs[act].modificada = new Date().toISOString();
+    localStorage.setItem("shg_versiones", JSON.stringify(vs));
+    if(window.SHG) SHG.pushHotel(act, D.idHotel);
+  }
+  pintarVinc(); if($("incPanel").classList.contains("open")) pintarIncPanel(); recompute();
+  marcarGuardado("Datos del hotel limpiados ✓");
+});
 
 // Desplegar meses por escenario desde la cabecera de la tabla (caret en Real/Fcast/Ppto).
 document.querySelectorAll("#cab .cx").forEach(cx=> cx.addEventListener("click", e=>{
