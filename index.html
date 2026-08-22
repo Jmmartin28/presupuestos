@@ -49,6 +49,8 @@
   .btn:hover { color:var(--ink); border-color:var(--muted); }
   .btn.prim { color:#fff; background:var(--res); border-color:var(--res); }
   .btn.gas { color:#fff; background:var(--gas); border-color:var(--gas); }
+  .btn.danger { color:var(--neg); border-color:var(--neg); }
+  .btn.danger:hover { background:rgba(192,57,43,.08); color:var(--neg); }
   .btn:disabled { opacity:.45; cursor:not-allowed; }
   /* Barra de versión activa + navegación */
   .vbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
@@ -111,7 +113,6 @@
           <div class="row" style="gap:8px">
             <select id="selVer"><option value="">Selecciona una versión…</option></select>
             <button class="btn gas" id="btnAbrir" disabled>Abrir</button>
-            <button class="btn" id="btnBorrar" disabled title="Borra la versión (metadatos y ajustes por hotel). No se puede deshacer.">🗑 Borrar</button>
           </div>
         </div>
       </div>
@@ -125,6 +126,7 @@
         <span style="flex:1"></span>
         <button class="btn" id="btnGuardarComo">Guardar como versión nueva</button>
         <button class="btn" id="btnCambiar">Cambiar de versión</button>
+        <button class="btn danger" id="btnEliminar" title="Elimina esta versión (metadatos y ajustes por hotel). No se puede deshacer.">Eliminar versión</button>
       </div>
       <h2>Ir a</h2>
       <div class="tabs" id="tabs"></div>
@@ -308,27 +310,28 @@ function activar(id){
   idActivo=id; modo="activa"; localStorage.setItem(LS_ACT, id);
   const reg=leerVersiones()[id];
   $("vBadge").textContent=reg.nombre; $("vMeta").textContent=`Ejercicio ${reg.anio}${reg.autor?" · "+reg.autor:""}`;
-  $("barra").classList.remove("hidden");
+  $("barra").classList.remove("hidden"); $("btnEliminar").disabled=false;
   cargarGeneral(reg); mostrarForm("Editar versión", "Guardar cambios");
 }
 
 $("btnNueva").addEventListener("click", ()=>{ modo="nueva"; limpiarGeneral(); $("anio").value=D.anio;
   $("barra").classList.add("hidden"); mostrarForm("Nueva versión", "Crear versión"); $("nombre").focus(); });
-$("selVer").addEventListener("change", ()=>{ const v=!$("selVer").value; $("btnAbrir").disabled=v; $("btnBorrar").disabled=v; });
+$("selVer").addEventListener("change", ()=>{ $("btnAbrir").disabled = !$("selVer").value; });
 $("btnAbrir").addEventListener("click", ()=>{ const id=$("selVer").value; if(id) activar(id); });
-$("btnBorrar").addEventListener("click", async ()=>{
-  const id=$("selVer").value; if(!id) return;
-  const vs=leerVersiones(), reg=vs[id]; if(!reg) return;
-  if(!confirm(`¿Borrar la versión "${reg.nombre}" (${reg.anio})?\n\nSe eliminarán sus metadatos y todos los ajustes por hotel. Esta acción no se puede deshacer.`)) return;
-  $("btnBorrar").disabled=true; $("btnAbrir").disabled=true;
+$("btnCambiar").addEventListener("click", mostrarInicio);
+// Eliminar la versión ACTIVA (desde la barra de la sesión abierta). Con confirmación.
+$("btnEliminar").addEventListener("click", async ()=>{
+  if(!idActivo) return;
+  const vs=leerVersiones(), reg=vs[idActivo]; if(!reg) return;
+  if(!confirm(`¿Seguro que quieres eliminar la versión "${reg.nombre}" (${reg.anio})?\n\n`
+    + `Se eliminarán sus metadatos y todos los ajustes por hotel. Esta acción no se puede deshacer.`)) return;
+  const id=idActivo; $("btnEliminar").disabled=true;
   try {
     if(window.SHG && SHG.deleteVersion) await SHG.deleteVersion(id);   // borra en SharePoint (nube)
     delete vs[id]; guardarVersiones(vs);
-    if(idActivo===id) mostrarInicio();
-    pintarSelector(); $("selVer").value="";
-  } catch(e){ alert("No se pudo borrar la versión en SharePoint: "+((e&&e.message)||e)); }
+    mostrarInicio();   // la versión activa ya no existe: vuelve al selector
+  } catch(e){ alert("No se pudo eliminar la versión en SharePoint: "+((e&&e.message)||e)); $("btnEliminar").disabled=false; }
 });
-$("btnCambiar").addEventListener("click", mostrarInicio);
 
 // Mezcla los datos generales del formulario sobre el registro previo, CONSERVANDO
 // los datos por hotel (medidas, alojamiento, personal) que guardan las otras páginas.
