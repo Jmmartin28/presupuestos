@@ -3,17 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Alojamiento · SB Bahía Málaga</title>
+<title>Alojamiento · …</title>
 <style>
   :root {
     --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
     --ing:#157347; --ing-bg:#e8f3ec; --inp:#0f766e; --inp-bg:#e5f1ef; --neg:#c0392b;
+    /* Un color por fila editable (Días / Ocupación nº / Ocupación % / ADR). */
+    --r-dias:#e8f0fb; --r-dias-ink:#2f6db0; --r-ocu:#e9f3ec; --r-ocu-ink:#157347;
+    --r-pct:#f1e9fb; --r-pct-ink:#7c4dbf; --r-adr:#f7efe1; --r-adr-ink:#b9722a;
     --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d;
       --ing:#4ac07e; --ing-bg:#15301f; --inp:#4fd1c5; --inp-bg:#14312e; --neg:#ff6b5e;
+      --r-dias:#16283c; --r-dias-ink:#7db3e6; --r-ocu:#15301f; --r-ocu-ink:#4ac07e;
+      --r-pct:#241a3a; --r-pct-ink:#b79be6; --r-adr:#312819; --r-adr-ink:#e0a566;
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
     }
   }
@@ -56,6 +61,11 @@
     font-weight:700; padding-top:14px; border-bottom:none; background:var(--panel); text-align:left; }
   tr.inp td.lbl { color:var(--inp); font-weight:600; background:var(--inp-bg); }
   tr.inp td { background:var(--inp-bg); }
+  /* Cada fila editable con su propio color para distinguirlas de un vistazo. */
+  tr.inp-dias td { background:var(--r-dias); } tr.inp-dias td.lbl { color:var(--r-dias-ink); background:var(--r-dias); }
+  tr.inp-ocu  td { background:var(--r-ocu);  } tr.inp-ocu  td.lbl { color:var(--r-ocu-ink);  background:var(--r-ocu);  }
+  tr.inp-pct  td { background:var(--r-pct);  } tr.inp-pct  td.lbl { color:var(--r-pct-ink);  background:var(--r-pct);  }
+  tr.inp-adr  td { background:var(--r-adr);  } tr.inp-adr  td.lbl { color:var(--r-adr-ink);  background:var(--r-adr);  }
   input.c { width:64px; font:inherit; font-size:12.5px; text-align:right; padding:3px 5px;
     border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
   input.c:focus { outline:2px solid var(--inp); border-color:var(--inp); }
@@ -89,6 +99,8 @@
     white-space:nowrap; color:var(--muted); }
   .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
   .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
+  /* Cabecera de cada ventana en Aptos Display negrita (con alternativas si no está instalada). */
+  body h1 { font-family:"Aptos Display","Aptos","Segoe UI",system-ui,-apple-system,sans-serif; font-weight:700; letter-spacing:-.005em; }
 </style>
 <div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="on" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="comparativo.html" class="" title="Comparativo">⚖️ Comparativo</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
 <script>
@@ -115,8 +127,8 @@
 </script>
 
   <div class="wrap">
-    <h1>Alojamiento · SB Bahía Málaga</h1>
-    <div class="sub">Consultora Hotelera, SL · 44 habitaciones · Ingresos de alojamiento 2027</div>
+    <h1>Alojamiento · …</h1>
+    <div class="sub"></div>
     <p class="hint">Introduce la <b>Ocupación 2027</b> (en nº de noches o en %) y el <b>ADR 2027</b> por mes.
       La venta de alojamiento = Ocupación × ADR. Los días son editables (hoteles que no abren todo el mes).
       Arranca con los datos del año en curso; ajústalos.</p>
@@ -143,8 +155,11 @@
 <script>
 (async function(){
 const D = await SHG.datos("alojamiento"); if(!D) return;   // datos desde SharePoint (o local)
-// Hotel activo: el embebido por defecto o el de ?hotel= en la URL; se exponen sus datos en D.
-(function(){ const p=new URLSearchParams(location.search).get("hotel"); if(p && D.porHotel[p]) D.idHotel=+p; })();
+// Hotel activo: ?hotel= de la URL > último hotel guardado (compartido entre ventanas) > embebido.
+(function(){ const p=new URLSearchParams(location.search).get("hotel");
+  const st=+localStorage.getItem("shg_hotel_activo");
+  const id=(p&&D.porHotel[p])?+p:((st&&D.porHotel[st])?st:D.idHotel);
+  D.idHotel=id; try{localStorage.setItem("shg_hotel_activo",String(id));}catch(e){} })();
 Object.assign(D, D.porHotel[D.idHotel]);
 const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const g3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");     // separador de miles siempre
@@ -217,7 +232,7 @@ function ref(label,arr,fmt,tot){ return `<tr class="ref"><td class="lbl">${label
 function calc(cls,id,label){ return `<tr class="calc ${cls}"><td class="lbl">${label}</td>`
   + M.map((_,i)=>`<td class="num mes"><span class="amt" id="${id}-${i}"></span><span class="delta" id="${id}-${i}d"></span></td>`).join("")
   + `<td class="num tot"><span class="amt" id="${id}-t"></span><span class="delta" id="${id}-td"></span></td></tr>`; }
-function inp(key,label,fmt,init){ const a = init || S[key]; return `<tr class="inp"><td class="lbl">${label}</td>`
+function inp(key,label,fmt,init){ const a = init || S[key]; return `<tr class="inp inp-${key}"><td class="lbl">${label}</td>`
   + M.map((_,i)=>`<td class="icell mes"><input class="c" data-k="${key}" data-m="${i}" value="${fmt(a[i])}"><span class="delta" id="${key}-${i}d"></span></td>`).join("")
   + `<td class="num tot"><span class="amt" id="${key}-t"></span><span class="delta" id="${key}-td"></span></td></tr>`; }
 
@@ -304,7 +319,7 @@ $("limpiar").addEventListener("click", () => {       // vacía todo menos Días
 });
 
 // Selector de hotel (cambia recargando con ?hotel=).
-$("selHotel").addEventListener("change",()=>{ location.href="alojamiento.html?hotel="+$("selHotel").value; });
+$("selHotel").addEventListener("change",()=>{ const v=$("selHotel").value; try{localStorage.setItem("shg_hotel_activo",v);}catch(e){} location.href="alojamiento.html?hotel="+v; });
 // El selector muestra los hoteles de la versión (Inicio) permitidos para el usuario;
 // si el hotel abierto no está incluido/permitido, salta al primero que sí lo esté.
 function _permH(h){ return !(window.SHG && SHG.sesion && SHG.sesion()) ? true : SHG.hotelPermitido(h.id, h.idZona, h.zona); }

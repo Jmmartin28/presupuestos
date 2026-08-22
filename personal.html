@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Personal · SB Bahía Málaga</title>
+<title>Personal · …</title>
 <style>
   :root {
     --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
@@ -84,6 +84,8 @@
     white-space:nowrap; color:var(--muted); }
   .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
   .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
+  /* Cabecera de cada ventana en Aptos Display negrita (con alternativas si no está instalada). */
+  body h1 { font-family:"Aptos Display","Aptos","Segoe UI",system-ui,-apple-system,sans-serif; font-weight:700; letter-spacing:-.005em; }
 </style>
 <div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="on" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="comparativo.html" class="" title="Comparativo">⚖️ Comparativo</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
 <script>
@@ -110,8 +112,8 @@
 </script>
 
   <div class="wrap">
-    <h1>Personal · <span id="tit">SB Bahía Málaga</span></h1>
-    <div class="sub">Consultora Hotelera, SL · Personal 2027 · pestaña Bahía · plantilla = Σ(FTE×sueldo); absentismo/vacaciones/eventos = % de la plantilla (editable y con override manual)</div>
+    <h1>Personal · <span id="tit">…</span></h1>
+    <div class="sub"> · plantilla = Σ(FTE×sueldo); absentismo/vacaciones/eventos = % de la plantilla (editable y con override manual)</div>
     <div class="controls">
       <div class="ctl"><label>Hotel</label><select id="selHotel"></select></div>
       <div class="ctl"><label>% Absentismo</label><input type="number" id="pAbs" step="0.5"></div>
@@ -138,8 +140,11 @@
 <script>
 (async function(){
 const D = await SHG.datos("personal"); if(!D) return;   // datos desde SharePoint (o local)
-// Hotel activo: el embebido por defecto o el de ?hotel= en la URL.
-(function(){ const p=new URLSearchParams(location.search).get("hotel"); if(p && D.porHotel[p]) D.idHotel=+p; })();
+// Hotel activo: ?hotel= de la URL > último hotel guardado (compartido entre ventanas) > embebido.
+(function(){ const p=new URLSearchParams(location.search).get("hotel");
+  const st=+localStorage.getItem("shg_hotel_activo");
+  const id=(p&&D.porHotel[p])?+p:((st&&D.porHotel[st])?st:D.idHotel);
+  D.idHotel=id; try{localStorage.setItem("shg_hotel_activo",String(id));}catch(e){} })();
 D.personal = D.porHotel[D.idHotel].personal;
 const P = D.personal;
 const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -306,7 +311,7 @@ $("copiar").addEventListener("click",()=>{
     fteFc:Z(), sueldoFc:0, ftePrev:Z(), sueldoPrev:0 }));
   recompute(); guardarPers();
 });
-$("selHotel").addEventListener("change",()=>{ location.href="personal.html?hotel="+$("selHotel").value; });
+$("selHotel").addEventListener("change",()=>{ const v=$("selHotel").value; try{localStorage.setItem("shg_hotel_activo",v);}catch(e){} location.href="personal.html?hotel="+v; });
 // El selector muestra los hoteles de la versión (Inicio) permitidos para el usuario;
 // si el hotel abierto no está incluido/permitido, salta al primero que sí lo esté.
 function _permH(h){ return !(window.SHG && SHG.sesion && SHG.sesion()) ? true : SHG.hotelPermitido(h.id, h.idZona, h.zona); }

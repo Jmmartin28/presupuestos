@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Presupuesto · SB Bahía Málaga</title>
+<title>Presupuesto · …</title>
 <style>
   :root {
     --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
@@ -125,6 +125,8 @@
     white-space:nowrap; color:var(--muted); }
   .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
   .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
+  /* Cabecera de cada ventana en Aptos Display negrita (con alternativas si no está instalada). */
+  body h1 { font-family:"Aptos Display","Aptos","Segoe UI",system-ui,-apple-system,sans-serif; font-weight:700; letter-spacing:-.005em; }
 </style>
 <div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="on" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="comparativo.html" class="" title="Comparativo">⚖️ Comparativo</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
 <script>
@@ -151,8 +153,8 @@
 </script>
 
   <div class="wrap">
-    <h1>Presupuesto · <span id="tit">SB Bahía Málaga</span></h1>
-    <div class="sub">Consultora Hotelera, SL · 44 habitaciones · Presupuesto 2027 · métodos aditivos: Fijo (mensual) + Ratio·ocupación + %·ventas + Fórmula; vacío = incremento sobre forecast</div>
+    <h1>Presupuesto · <span id="tit">…</span></h1>
+    <div class="sub"> · métodos aditivos: Fijo (mensual) + Ratio·ocupación + %·ventas + Fórmula; vacío = incremento sobre forecast</div>
     <div class="controls">
       <div class="ctl"><label>Hotel (trabajando)</label><select id="selHotel"></select></div>
       <button class="btn" id="toggleAll">Desplegar partidas</button>
@@ -169,9 +171,11 @@
 <script>
 (async function(){
 const D = await SHG.datos("hoja_trabajo"); if(!D) return;   // datos desde SharePoint (o local)
-// Hotel activo: el embebido por defecto o el que venga en ?hotel= de la URL.
+// Hotel activo: ?hotel= de la URL > último hotel guardado (compartido entre ventanas) > embebido.
 (function(){ const p=new URLSearchParams(location.search).get("hotel");
-  if(p && D.porHotel[p]) D.idHotel = +p; })();
+  const st=+localStorage.getItem("shg_hotel_activo");
+  const id=(p&&D.porHotel[p])?+p:((st&&D.porHotel[st])?st:D.idHotel);
+  D.idHotel=id; try{localStorage.setItem("shg_hotel_activo",String(id));}catch(e){} })();
 D.grupos = D.porHotel[D.idHotel].grupos;
 D.drivers = D.porHotel[D.idHotel].drivers;
 const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -518,7 +522,7 @@ $("toggleAll").addEventListener("click",()=>{ const abrir=$("toggleAll").textCon
   document.querySelectorAll("tr.grupo").forEach(tr=>{ tr.classList.toggle("open",abrir);
     document.querySelectorAll(`tr.detalle[data-g="${tr.dataset.g}"]`).forEach(d=>d.classList.toggle("visible",abrir)); });
   $("toggleAll").textContent=abrir?"Contraer partidas":"Desplegar partidas"; });
-$("selHotel").addEventListener("change",()=>{ location.href = "hoja_trabajo.html?hotel=" + $("selHotel").value; });
+$("selHotel").addEventListener("change",()=>{ const v=$("selHotel").value; try{localStorage.setItem("shg_hotel_activo",v);}catch(e){} location.href = "hoja_trabajo.html?hotel=" + v; });
 // El selector muestra los hoteles de la versión (Inicio) permitidos para el usuario;
 // si el hotel abierto no está incluido/permitido, salta al primero que sí lo esté.
 function _permH(h){ return !(window.SHG && SHG.sesion && SHG.sesion()) ? true : SHG.hotelPermitido(h.id, h.idZona, h.zona); }

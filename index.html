@@ -21,7 +21,8 @@
   body { margin:0; background:var(--bg); color:var(--ink);
     font-family:"Segoe UI",system-ui,-apple-system,sans-serif; font-feature-settings:"tnum" 1; }
   .wrap { max-width:1080px; margin:0 auto; padding:22px 16px 60px; }
-  h1 { font-size:23px; margin:0; } .sub { color:var(--muted); font-size:12.5px; margin:2px 0 16px; }
+  h1 { font-size:23px; margin:0; font-family:"Aptos Display","Aptos","Segoe UI",system-ui,-apple-system,sans-serif; font-weight:700; letter-spacing:-.005em; }
+  .sub { color:var(--muted); font-size:12.5px; margin:2px 0 16px; }
   h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:18px 0 8px; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:12px;
     box-shadow:var(--shadow); padding:16px 18px; margin-bottom:14px; }
@@ -95,8 +96,9 @@
     <h1>Presupuestos SHG · Inicio</h1>
     <div class="sub">Elige si quieres crear una versión nueva o abrir una ya creada. Con una versión activa, desde aquí navegas a la hoja de trabajo y a los informes.</div>
 
-    <!-- Paso 1: elegir crear o abrir -->
-    <div class="card" id="inicio">
+    <!-- Paso 1: elegir crear o abrir (oculto hasta que el arranque decida, para no
+         mostrar el selector "crear/abrir" cuando ya hay una versión activa) -->
+    <div class="card hidden" id="inicio">
       <div class="choose">
         <div class="opt new">
           <div class="big">＋ Crear versión nueva</div>
@@ -189,6 +191,7 @@ const PAGINAS = [
   {p:"resumen",      ic:"📊", lab:"Resumen"},
   {p:"analisis",     ic:"📈", lab:"Análisis"},
   {p:"por_partida",  ic:"🧾", lab:"Por Partida"},
+  {p:"comparativo",  ic:"⚖️", lab:"Comparativo"},
   {p:"consolidado",  ic:"🏛️", lab:"Consolidado"},
 ];
 
