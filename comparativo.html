@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe comparativo</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef; --neg:#c0392b; --pos:#157347;
+    --ing:#157347; --ing-bg:#e8f3ec; --gas:#34618e; --gas-bg:#eaf1f8;
+    --gop:#b9722a; --gop-bg:#f7efe1; --res:#0f766e; --res-bg:#e5f1ef;
+    --bA:#dfe6f2; --bB:#dcefe3; --bD:#f5e9d4; --th:#eef1f5;
+    --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d; --neg:#ff6b5e; --pos:#4ac07e;
+      --ing:#4ac07e; --ing-bg:#15301f; --gas:#6ea8dc; --gas-bg:#152634;
+      --gop:#e0a566; --gop-bg:#312819; --res:#4fd1c5; --res-bg:#14312e;
+      --bA:#1c2740; --bB:#163021; --bD:#332616; --th:#1b2531;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif; font-feature-settings:"tnum" 1; }
+  .wrap { max-width:99vw; margin:0 auto; padding:22px 14px 60px; }
+  h1 { font-size:22px; margin:0; } .sub { color:var(--muted); font-size:12.5px; margin:2px 0 12px; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin-bottom:10px; }
+  .side-ctl { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:10px; padding:6px 10px; background:var(--panel); }
+  .side-ctl .tag { font-weight:800; font-size:12.5px; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
+  .side-ctl.A .tag { background:var(--bA); color:var(--gas); } .side-ctl.B .tag { background:var(--bB); color:var(--ing); }
+  select.per { font:inherit; font-size:12.5px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+  .btn { font:inherit; font-size:12.5px; color:var(--muted); background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:7px 12px; cursor:pointer; }
+  .btn:hover { color:var(--ink); border-color:var(--muted); } .btn.on { color:var(--gas); border-color:var(--gas); background:var(--gas-bg); }
+  .dd { position:relative; }
+  .dd-panel { display:none; position:absolute; top:38px; left:0; z-index:40; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:10px 12px;
+    max-height:380px; overflow:auto; min-width:300px; }
+  .dd-panel.open { display:block; }
+  .dd-panel .grp { font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; margin:8px 0 4px; }
+  .dd-panel label { display:flex; gap:6px; align-items:center; font-size:12.5px; padding:2px 0; white-space:nowrap; }
+  .dd-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .dd-actions .btn { padding:4px 8px; font-size:11.5px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); overflow:auto; max-height:calc(100vh - 220px); }
+  table { border-collapse:separate; border-spacing:0; font-size:12px; }
+  th, td { padding:4px 9px; border-bottom:1px solid var(--line); white-space:nowrap; text-align:right; }
+  thead th { font-size:10.5px; color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--panel); z-index:6; }
+  thead tr.h2 th { top:27px; }
+  th.lbl, td.lbl { text-align:left; position:sticky; left:0; background:var(--panel); z-index:5; min-width:210px; }
+  thead th.lbl { z-index:8; }
+  td.num { font-variant-numeric:tabular-nums; }
+  .pctv { display:inline-block; margin-left:6px; font-size:9.5px; color:var(--muted); }
+  .cx { cursor:pointer; user-select:none; margin-right:5px; color:var(--gas); font-weight:700; }
+  th.bA { background:var(--bA); } th.bB { background:var(--bB); } th.bD { background:var(--bD); }
+  td.tcA, th.tcA { background:var(--bA); } td.tcB, th.tcB { background:var(--bB); } td.tcD, th.tcD { background:var(--bD); }
+  td.anio, th.anio { border-left:1px solid var(--line); font-weight:600; }
+  td.mes, th.mes { color:var(--muted); font-weight:400; }
+  td.sep, th.sep { border-left:3px solid var(--gas); }
+  td.dpos { color:var(--pos); } td.dneg { color:var(--neg); }
+  tr.sec td { font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+    font-weight:700; padding-top:10px; border-bottom:none; background:var(--panel); text-align:left; }
+  tr.tI td { font-weight:700; background:var(--ing-bg); } tr.tI td.lbl { color:var(--ing); }
+  tr.tG td { font-weight:700; background:var(--gas-bg); } tr.tG td.lbl { color:var(--gas); }
+  tr.tP td, tr.tE td { font-weight:700; background:var(--gop-bg); } tr.tP td.lbl, tr.tE td.lbl { color:var(--gop); }
+  tr.tR td { font-weight:800; background:var(--res-bg); } tr.tR td.lbl { color:var(--res); }
+  tr.stat td { color:var(--muted); } tr.stat td.lbl { font-style:italic; }
+  footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=8"></script><script src="shg-cloud.js?v=8"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("comparativo");</script>
+<style>
+  .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
+    flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(20,30,50,.05); }
+  .appbar .ab-home { font:inherit; font-size:12.5px; font-weight:700; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 11px;
+    text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .appbar .ab-home:hover { border-color:var(--gas); color:var(--gas); }
+  .appbar .ab-nav { display:flex; flex-wrap:wrap; gap:5px; }
+  .appbar .ab-nav a { font-size:12px; color:var(--muted); text-decoration:none; border:1px solid transparent;
+    border-radius:7px; padding:5px 9px; white-space:nowrap; }
+  .appbar .ab-nav a:hover { color:var(--ink); border-color:var(--line); }
+  .appbar .ab-nav a.on { color:var(--gas); border-color:var(--gas); background:var(--gas-bg); font-weight:700; }
+  .appbar .ab-sp { flex:1; }
+  .appbar .ab-ver { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px;
+    padding:5px 12px; white-space:nowrap; }
+  .appbar .ab-ver.on { color:var(--res); border-color:var(--res); background:var(--res-bg); font-weight:700; }
+  .ab-nube { font-size:11.5px; border:1px solid var(--line); border-radius:999px; padding:5px 10px;
+    white-space:nowrap; color:var(--muted); }
+  .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
+  .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
+</style>
+<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="comparativo.html" class="on" title="Comparativo">⚖️ Comparativo</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
+<script>
+(function(){
+  try {
+    var act = localStorage.getItem("shg_version_activa");
+    var vs = JSON.parse(localStorage.getItem("shg_versiones") || "{}");
+    var el = document.getElementById("abVer");
+    if (act && vs[act]) {
+      el.textContent = "Versión: " + vs[act].nombre + " · " + vs[act].anio;
+      el.classList.add("on");
+    } else {
+      el.textContent = "Sin versión activa";
+    }
+  } catch (e) {}
+  // Propaga el hotel activo (?hotel=) a los enlaces de navegación por hotel.
+  try {
+    var h = new URLSearchParams(location.search).get("hotel");
+    if (h) document.querySelectorAll(".appbar .ab-nav a").forEach(function (a) {
+      a.href += (a.href.indexOf("?") < 0 ? "?" : "&") + "hotel=" + h;
+    });
+  } catch (e) {}
+})();
+</script>
+
+  <div class="wrap">
+    <h1>Informe comparativo</h1>
+    <div class="sub">Compara dos selecciones (A y B), cada una con su periodo. Diferencia = A − B (importe y %). Ppto 2027 aplica los incrementos de la versión activa sobre el forecast.</div>
+    <div class="controls">
+      <div class="side-ctl A"><span class="tag">A</span>
+        <select class="per" id="perA"></select>
+        <div class="dd"><button class="btn" id="ddBtnA">Entidades ▾</button><div id="selA" class="dd-panel"></div></div>
+      </div>
+      <div class="side-ctl B"><span class="tag">B</span>
+        <select class="per" id="perB"></select>
+        <div class="dd"><button class="btn" id="ddBtnB">Entidades ▾</button><div id="selB" class="dd-panel"></div></div>
+      </div>
+      <button class="btn" id="swap">⇄ Intercambiar</button>
+      <button class="btn" id="expAll">Expandir meses</button>
+      <button class="btn" id="compAll">Comprimir</button>
+    </div>
+    <div class="card"><table id="t"><thead id="cab"></thead><tbody id="cuerpo"></tbody></table></div>
+    <footer>App de Presupuestos SHG · informe comparativo · las entidades disponibles dependen de la versión activa y de tus permisos</footer>
+  </div>
+<script>
+(async function(){
+const D = await SHG.datos("comparativo"); if(!D) return;   // datos desde SharePoint (o local)
+const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const Z = () => new Array(12).fill(0);
+const g3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const n0 = x => (x<0?"-":"") + g3(String(Math.round(Math.abs(x))));
+const n1 = x => (Math.round(x*10)/10).toLocaleString("es-ES",{minimumFractionDigits:1,maximumFractionDigits:1});
+const $ = id => document.getElementById(id);
+const sum = a => a.reduce((x,y)=>x+y,0);
+const suma = (a,b) => a.map((v,i)=>v+(b[i]||0));
+const IDX_ALO = D.idxAlojamiento;
+const IDX_TI = D.filas.findIndex(f=>f.tipo==="tI");
+
+// ---- Periodos comparables ----
+const PERIODOS = [
+  {k:"real2025", lab:"Real 2025"},
+  {k:"real2026", lab:"Real 2026"},
+  {k:"fc2026",   lab:"Forecast 2026"},
+  {k:"ppto2026", lab:"Ppto 2026"},
+  {k:"ppto2027", lab:"Ppto 2027"},
+];
+const labPer = k => (PERIODOS.find(p=>p.k===k)||{}).lab || k;
+
+// ---- Versión activa: el Ppto 2027 = forecast por categoría con incrementos ----
+function activeVersion(){ try{ const a=localStorage.getItem("shg_version_activa");
+  const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); return a&&vs[a]?vs[a]:null; }catch(e){ return null; } }
+function hotelIncluido(id){ const v=activeVersion(); return !v || !Array.isArray(v.hoteles) || v.hoteles.indexOf(id)!==-1; }
+function permitido(h){ return !(window.SHG && SHG.sesion && SHG.sesion()) ? true : SHG.hotelPermitido(h.id, h.idZona, h.zona); }
+function calcHOT(){ return D.hoteles.slice().filter(h=> hotelIncluido(h.id) && permitido(h)).sort((a,b)=> (a.hotelera-b.hotelera) || a.nombre.localeCompare(b.nombre)); }
+let HOT = calcHOT();
+function incFrac(cat, idHotel){ const v=activeVersion(); if(!v||!cat) return 0;
+  const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
+function mesCorte(){ const v=activeVersion(); return v && typeof v.mesAuditado==="number" ? v.mesAuditado : null; }
+function catMesCorte(h){
+  const N=mesCorte();
+  if(N===null || !h.catRealMes || !h.catPptoMes) return h.catMes;   // automático (horneado)
+  const out={}; D.catClaves.forEach(k=>{ const r=h.catRealMes[k]||Z(), p=h.catPptoMes[k]||Z(), a=Z();
+    for(let m=0;m<12;m++) a[m]= m<N ? r[m] : p[m]; out[k]=a; });
+  return out;
+}
+function ocuCorte(h, concepto){
+  const N=mesCorte();
+  if(N===null || !h.ocuReal || !h.ocuPpto) return h[concepto]||Z();
+  const r=h.ocuReal[concepto]||Z(), p=h.ocuPpto[concepto]||Z();
+  return M.map((_,m)=> m<N ? r[m] : p[m]);
+}
+// Ppto 2027 mensual por categoría de una entidad (con override de la Central en MF).
+function cvMes(h){
+  const v=activeVersion(), pc = v && v.pptoCat && v.pptoCat[h.id];
+  const cm=catMesCorte(h);
+  const cv={}; D.catClaves.forEach(k=> cv[k]= (pc && Array.isArray(pc[k])) ? pc[k].slice() : (cm[k]||Z()).map(x=> x*(1+incFrac(k,h.id))));
+  if(h.esCentral) cv.mf_ing = mfCentralPptoMes();
+  return cv;
+}
+function mfCentralManualMes(){ const v=activeVersion(); const a=v&&v.centralMf;
+  return Array.isArray(a)&&a.length===12 ? a.map(x=>+x||0) : null; }
+// Σ del coste de Management Fees de las hoteleras incluidas, por periodo (intragrupo).
+function mfCentralIntragrupo(per){
+  if(per==="ppto2027"){ const man=mfCentralManualMes(); if(man) return man; }
+  const acc=Z();
+  HOT.forEach(h=>{ if(h.hotelera && !h.esCentral){
+    const c = per==="ppto2027" ? cvMes(h)
+            : per==="ppto2026" ? h.catPptoMes
+            : per==="fc2026"   ? catMesCorte(h)
+            : per==="real2026" ? h.catRealMes
+            :                    h.catReal2025Mes;
+    const s=(c&&c.management_fees)||Z(); for(let m=0;m<12;m++) acc[m]+=s[m]||0; } });
+  return acc;
+}
+function mfCentralPptoMes(){ return mfCentralIntragrupo("ppto2027"); }
+
+// Serie mensual por categoría de una entidad para el periodo elegido.
+function catSeriePeriodo(h, per){
+  if(per==="ppto2027") return cvMes(h);
+  let base;
+  if(per==="real2025") base=h.catReal2025Mes;
+  else if(per==="real2026") base=h.catRealMes;
+  else if(per==="ppto2026") base=h.catPptoMes;
+  else base=catMesCorte(h);   // fc2026
+  const cv={}; D.catClaves.forEach(k=> cv[k]=((base&&base[k])||Z()).slice());
+  // Central: MF real = actual de la hoja SHG (ya en base); MF de ppto / forecast futuro = intragrupo.
+  if(h.esCentral){
+    if(per==="ppto2026") cv.mf_ing = mfCentralIntragrupo("ppto2026");
+    else if(per==="fc2026"){ const N=mesCorte();
+      if(N!==null){ const intg=mfCentralIntragrupo("fc2026"), real=(h.catRealMes&&h.catRealMes.mf_ing)||Z();
+        cv.mf_ing = M.map((_,m)=> m<N ? (real[m]||0) : intg[m]); } }
+  }
+  return cv;
+}
+function ocuSeriePeriodo(h, per){
+  if(per==="real2025") return {ocu:Z(), disp:Z()};   // sin ocupación del año anterior
+  if(per==="real2026") return {ocu:(h.ocuReal&&h.ocuReal.ocupadas)||Z(), disp:(h.ocuReal&&h.ocuReal.disponibles)||Z()};
+  if(per==="ppto2026") return {ocu:(h.ocuPpto&&h.ocuPpto.ocupadas)||Z(), disp:(h.ocuPpto&&h.ocuPpto.disponibles)||Z()};
+  return {ocu:ocuCorte(h,"ocupadas"), disp:ocuCorte(h,"disponibles")};   // fc2026 / ppto2027
+}
+// P&L (filas) a partir de una serie de categorías mensual.
+function filasDeCv(cv){
+  const sumc = list => list.reduce((acc,k)=> acc.map((v,i)=>v+(cv[k]||Z())[i]), Z());
+  const tI=sumc(D.catIngresos), tG=sumc(D.catOperativos), gop=tI.map((v,i)=>v-tG[i]);
+  const mf=cv.management_fees||Z(), alq=cv.arrendamientos||Z(), onp=cv.otros_no_op||Z(), soc=cv.societarios||Z();
+  const eb=gop.map((v,i)=>v-mf[i]-alq[i]-onp[i]), rn=eb.map((v,i)=>v-soc[i]);
+  return D.filasCat.map((cat,fi)=>{ if(cat) return (cv[cat]||Z()).slice();
+    const t=D.filas[fi].tipo;
+    return t==="tI"?tI: t==="tG"?tG: t==="tP"?gop: t==="tE"?eb: t==="tR"?rn: Z(); });
+}
+
+// ---- Estado de los dos lados ----
+const lados = { A:{periodo:"fc2026", sel:{}}, B:{periodo:"ppto2027", sel:{}} };
+function initSel(){ ["A","B"].forEach(L=>{ lados[L].sel={}; HOT.forEach(h=> lados[L].sel[h.id]=true); }); }
+initSel();
+const exp = {A:false, B:false, D:false};   // despliegue por meses de cada bloque
+
+function etiquetaSel(hs){
+  if(hs.length===0) return "(vacío)";
+  if(hs.length===HOT.length) return "Total agregado";
+  const setIds=new Set(hs.map(h=>h.id));
+  const hotAll=HOT.filter(h=>h.hotelera), nohAll=HOT.filter(h=>!h.hotelera);
+  if(hotAll.length && hs.length===hotAll.length && hotAll.every(h=>setIds.has(h.id))) return "Total hoteleras";
+  if(nohAll.length && hs.length===nohAll.length && nohAll.every(h=>setIds.has(h.id))) return "Total no hoteleras";
+  for(const z of (D.zonas||[])){ const zh=HOT.filter(h=>String(h.idZona)===String(z.id));
+    if(zh.length && zh.length===hs.length && zh.every(h=>setIds.has(h.id))) return z.nombre; }
+  if(hs.length===1) return hs[0].nombre;
+  return hs.length+" entidades";
+}
+function ladoDatos(L){
+  const st=lados[L]; const hs=HOT.filter(h=> st.sel[h.id]);
+  const cv={}; D.catClaves.forEach(k=> cv[k]=Z());
+  const ocu=Z(), disp=Z();
+  hs.forEach(h=>{ const c=catSeriePeriodo(h, st.periodo); D.catClaves.forEach(k=> cv[k]=suma(cv[k], c[k]));
+    const o=ocuSeriePeriodo(h, st.periodo); for(let m=0;m<12;m++){ ocu[m]+=o.ocu[m]; disp[m]+=o.disp[m]; } });
+  return { hs, periodo:st.periodo, etiqueta:etiquetaSel(hs), filas:filasDeCv(cv), ocu, disp };
+}
+
+// ---- Selectores de periodo y de entidades ----
+function pintarPeriodos(){ ["A","B"].forEach(L=>{ const s=$("per"+L);
+  s.innerHTML=PERIODOS.map(p=>`<option value="${p.k}" ${lados[L].periodo===p.k?"selected":""}>${p.lab}</option>`).join("");
+  s.onchange=()=>{ lados[L].periodo=s.value; render(); }; }); }
+function pintarSel(L){
+  const st=lados[L];
+  const grupo=(t,cond)=>`<div class="grp">${t}</div>`+HOT.filter(cond).map(h=>`<label><input type="checkbox" data-h="${h.id}" ${st.sel[h.id]?"checked":""}> ${h.nombre}</label>`).join("");
+  const zbtns=(D.zonas||[]).map(z=>`<button class="btn" data-z="${z.id}">${z.nombre}</button>`).join("");
+  const panel=$("sel"+L);
+  panel.innerHTML=`<div class="dd-actions"><button class="btn" data-a="todos">Total agregado</button><button class="btn" data-a="hot">Hoteleras</button><button class="btn" data-a="noh">No hoteleras</button><button class="btn" data-a="ninguno">Ninguno</button></div>`
+    + (zbtns ? `<div class="dd-actions">${zbtns}</div>` : "")
+    + grupo("Sociedades no hoteleras", h=>!h.hotelera) + grupo("Sociedades hoteleras", h=>h.hotelera);
+  panel.querySelectorAll('input').forEach(c=>c.addEventListener("change",()=>{ st.sel[c.dataset.h]=c.checked; actualizarBtn(L); render(); }));
+  panel.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener("click",()=>{
+    const a=b.dataset.a;
+    HOT.forEach(h=> st.sel[h.id]= a==="todos"?true : a==="ninguno"?false : a==="hot"?h.hotelera : !h.hotelera);
+    pintarSel(L); actualizarBtn(L); render(); }));
+  panel.querySelectorAll('button[data-z]').forEach(b=>b.addEventListener("click",()=>{
+    HOT.forEach(h=> st.sel[h.id]= String(h.idZona)===b.dataset.z);
+    pintarSel(L); actualizarBtn(L); render(); }));
+}
+function actualizarBtn(L){ const n=HOT.filter(h=>lados[L].sel[h.id]).length; $("ddBtn"+L).textContent=`${etiquetaSel(HOT.filter(h=>lados[L].sel[h.id]))} (${n}) ▾`; }
+["A","B"].forEach(L=>{
+  $("ddBtn"+L).addEventListener("click", e=>{ e.stopPropagation(); $("sel"+L).classList.toggle("open"); });
+});
+document.addEventListener("click", e=>{ if(!e.target.closest(".dd")){ $("selA").classList.remove("open"); $("selB").classList.remove("open"); } });
+
+// ---- Render de la tabla ----
+function celPct(v, tot){ return Math.abs(tot)>0.5 ? `<span class="pctv">${(v/tot*100).toFixed(1)}%</span>` : ""; }
+function render(){
+  const A=ladoDatos("A"), B=ladoDatos("B");
+  const totIA=sum(A.filas[IDX_TI]), totIB=sum(B.filas[IDX_TI]);
+  const spanA=exp.A?13:1, spanB=exp.B?13:1, spanD=exp.D?14:2;
+  // Cabecera fila 1
+  let head='<tr><th class="lbl">Concepto</th>';
+  head+=`<th class="anio bA" colspan="${spanA}"><span class="cx" data-k="A">${exp.A?'▾':'▸'}</span>A · ${A.etiqueta} · ${labPer(A.periodo)}</th>`;
+  head+=`<th class="anio bB sep" colspan="${spanB}"><span class="cx" data-k="B">${exp.B?'▾':'▸'}</span>B · ${B.etiqueta} · ${labPer(B.periodo)}</th>`;
+  head+=`<th class="anio bD sep" colspan="${spanD}"><span class="cx" data-k="D">${exp.D?'▾':'▸'}</span>Diferencia (A − B)</th>`;
+  head+="</tr>";
+  // Cabecera fila 2 (meses / subcolumnas) si algún bloque está desplegado
+  if(exp.A||exp.B||exp.D){ head+='<tr class="h2"><th class="lbl"></th>';
+    head+= exp.A ? M.map((m,i)=>`<th class="mes">${m}</th>`).join("")+'<th class="anio tcA">año</th>' : '<th class="anio tcA"></th>';
+    head+= exp.B ? M.map((m,i)=>`<th class="mes${i===0?' sep':''}">${m}</th>`).join("")+'<th class="anio tcB">año</th>' : '<th class="anio tcB sep"></th>';
+    if(exp.D){ head+= M.map((m,i)=>`<th class="mes${i===0?' sep':''}">${m}</th>`).join("")+'<th class="anio tcD">€</th><th class="anio tcD">%</th>'; }
+    else head+='<th class="anio tcD sep">€</th><th class="anio tcD">%</th>';
+    head+="</tr>"; }
+  $("cab").innerHTML=head;
+  // Cuerpo
+  let body="";
+  D.filas.forEach((f,fi)=>{
+    if(f.tipo==="sec"){ body+=`<tr class="sec"><td class="lbl" colspan="999">${f.label}</td></tr>`; return; }
+    const rowCls={tI:"tI",tG:"tG",tP:"tP",tE:"tE",tR:"tR"}[f.tipo]||"";
+    const sa=A.filas[fi], sb=B.filas[fi], ta=sum(sa), tb=sum(sb), da=ta-tb;
+    body+=`<tr class="${rowCls}"><td class="lbl">${f.label}</td>`;
+    // Lado A
+    if(exp.A) sa.forEach(v=> body+=`<td class="num mes">${n0(v)}</td>`);
+    body+=`<td class="num anio tcA"><span>${n0(ta)}</span>${celPct(ta,totIA)}</td>`;
+    // Lado B
+    if(exp.B) sb.forEach((v,m)=> body+=`<td class="num mes${m===0?' sep':''}">${n0(v)}</td>`);
+    body+=`<td class="num anio tcB${exp.B?'':' sep'}"><span>${n0(tb)}</span>${celPct(tb,totIB)}</td>`;
+    // Diferencia
+    if(exp.D) sa.forEach((v,m)=>{ const d=v-sb[m]; body+=`<td class="num mes${m===0?' sep':''} ${d<0?'dneg':d>0?'dpos':''}">${n0(d)}</td>`; });
+    const cd = da<0?'dneg':da>0?'dpos':'';
+    const pd = Math.abs(tb)>0.5 ? (da/Math.abs(tb)*100).toFixed(1)+"%" : "—";
+    body+=`<td class="num anio tcD${exp.D?'':' sep'} ${cd}">${n0(da)}</td>`;
+    body+=`<td class="num anio tcD ${cd}">${pd}</td>`;
+    body+="</tr>";
+  });
+  // Estadísticas (Ocupación / ADR / RevPAR) para A y B; diferencia en blanco.
+  const aloA=A.filas[IDX_ALO], aloB=B.filas[IDX_ALO];
+  function statRow(label, fmesA, ftotA, fmesB, ftotB){
+    let r=`<tr class="stat"><td class="lbl">${label}</td>`;
+    if(exp.A) for(let m=0;m<12;m++) r+=`<td class="num mes">${fmesA(m)}</td>`;
+    r+=`<td class="num anio tcA">${ftotA()}</td>`;
+    if(exp.B) for(let m=0;m<12;m++) r+=`<td class="num mes${m===0?' sep':''}">${fmesB(m)}</td>`;
+    r+=`<td class="num anio tcB${exp.B?'':' sep'}">${ftotB()}</td>`;
+    if(exp.D) for(let m=0;m<12;m++) r+=`<td class="num mes${m===0?' sep':''}">—</td>`;
+    r+=`<td class="num anio tcD${exp.D?'':' sep'}">—</td><td class="num anio tcD">—</td>`;
+    return r+"</tr>";
+  }
+  body+=statRow("Ocupación %",
+    m=> A.disp[m]? n1(100*A.ocu[m]/A.disp[m])+"%":"—", ()=> sum(A.disp)? n1(100*sum(A.ocu)/sum(A.disp))+"%":"—",
+    m=> B.disp[m]? n1(100*B.ocu[m]/B.disp[m])+"%":"—", ()=> sum(B.disp)? n1(100*sum(B.ocu)/sum(B.disp))+"%":"—");
+  body+=statRow("ADR €",
+    m=> A.ocu[m]? n0(aloA[m]/A.ocu[m])+" €":"—", ()=> sum(A.ocu)? n0(sum(aloA)/sum(A.ocu))+" €":"—",
+    m=> B.ocu[m]? n0(aloB[m]/B.ocu[m])+" €":"—", ()=> sum(B.ocu)? n0(sum(aloB)/sum(B.ocu))+" €":"—");
+  body+=statRow("RevPAR €",
+    m=> A.disp[m]? n0(aloA[m]/A.disp[m])+" €":"—", ()=> sum(A.disp)? n0(sum(aloA)/sum(A.disp))+" €":"—",
+    m=> B.disp[m]? n0(aloB[m]/B.disp[m])+" €":"—", ()=> sum(B.disp)? n0(sum(aloB)/sum(B.disp))+" €":"—");
+  $("cuerpo").innerHTML=body;
+}
+
+$("cab").addEventListener("click", e=>{ const cx=e.target.closest(".cx"); if(!cx) return; exp[cx.dataset.k]=!exp[cx.dataset.k]; render(); });
+$("expAll").addEventListener("click",()=>{ exp.A=exp.B=exp.D=true; render(); });
+$("compAll").addEventListener("click",()=>{ exp.A=exp.B=exp.D=false; render(); });
+$("swap").addEventListener("click",()=>{ const t=lados.A; lados.A=lados.B; lados.B=t; pintarPeriodos(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render(); });
+
+pintarPeriodos(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render();
+// Cuando la puerta resuelve permisos, re-filtra entidades y re-render.
+window.addEventListener("shg:sesion", function(){ HOT=calcHOT(); initSel(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render(); });
+})();
+</script>
+</body>
+</html>
