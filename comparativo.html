@@ -71,7 +71,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=11"></script><script src="shg-cloud.js?v=11"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("comparativo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=12"></script><script src="shg-cloud.js?v=12"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("comparativo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -400,7 +400,12 @@ $("cab").addEventListener("click", e=>{ const cx=e.target.closest(".cx"); if(!cx
 $("expAll").addEventListener("click",()=>{ exp.A=exp.B=exp.D=true; render(); });
 $("compAll").addEventListener("click",()=>{ exp.A=exp.B=exp.D=false; render(); });
 $("swap").addEventListener("click",()=>{ const t=lados.A; lados.A=lados.B; lados.B=t; pintarPeriodos(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render(); });
-$("btnExcel").addEventListener("click",()=>{ if(window.SHG&&SHG.exportarExcel) SHG.exportarExcel("t","Comparativo"); });
+$("btnExcel").addEventListener("click",()=>{ if(!(window.SHG&&SHG.exportarExcel)) return;
+  // Exporta TODO desplegado (meses + año) y agrupa las columnas de meses en el Excel.
+  const pa=exp.A, pb=exp.B, pd=exp.D; exp.A=exp.B=exp.D=true; render();
+  SHG.exportarExcel("t","Comparativo", {group:true});
+  exp.A=pa; exp.B=pb; exp.D=pd; render();
+});
 
 pintarPeriodos(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render();
 // Cuando la puerta resuelve permisos, re-filtra entidades y re-render.

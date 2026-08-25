@@ -506,7 +506,7 @@
     if (suf === "%") fmt += "&quot;%&quot;"; else if (suf === "€") fmt += "&quot; €&quot;"; else if (suf === "pp") fmt += "&quot; pp&quot;";
     return { num: n, fmt: fmt };
   }
-  function exportarExcel(tabla, nombre) {
+  function exportarExcel(tabla, nombre, opts) {
     var el = typeof tabla === "string" ? document.getElementById(tabla) : tabla;
     if (!el) return;
     // Estilos dinámicos: replican los colores reales del informe (relleno, texto, negrita).
@@ -535,13 +535,14 @@
         '><alignment horizontal="' + align + '"/></xf>');
       return xfKey[k] = xfs.length - 1;
     }
-    var filas = [].slice.call(el.querySelectorAll("tr")), xml = "", nf = 0;
+    var filas = [].slice.call(el.querySelectorAll("tr")), xml = "", nf = 0, merges = [], mesCols = {}, maxCol = 0;
     filas.forEach(function (tr) {
       var celdas = [].slice.call(tr.children).filter(function (c) { return c.tagName === "TD" || c.tagName === "TH"; });
       if (!celdas.length) return;
       var esCab = tr.parentNode && tr.parentNode.tagName === "THEAD";
-      nf += 1; xml += '<row r="' + nf + '">';
-      celdas.forEach(function (cel, ci) {
+      nf += 1; var ci = 0; xml += '<row r="' + nf + '">';
+      celdas.forEach(function (cel) {
+        var span = parseInt(cel.getAttribute("colspan") || "1", 10) || 1;
         var ref = _colName(ci) + nf, cs = getComputedStyle(cel);
         var bg = _argb(cs.backgroundColor), col = _argb(cs.color);
         var bold = (+cs.fontWeight) >= 600 || cs.fontWeight === "bold";
@@ -554,9 +555,24 @@
         var s = xfId(fontId(col, bold || esCab), fillId(bg), (p.num != null ? numId(p.fmt) : 0), align);
         if (p.num != null) xml += '<c r="' + ref + '" s="' + s + '"><v>' + p.num + "</v></c>";
         else xml += '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t>' + _xmlesc(txt) + "</t></is></c>";
+        if (span > 1) merges.push(ref + ":" + _colName(ci + span - 1) + nf);   // cabecera combinada
+        if (cel.classList.contains("mes")) for (var k = 0; k < span; k++) mesCols[ci + k] = 1;
+        ci += span;
       });
+      if (ci > maxCol) maxCol = ci;
       xml += "</row>";
     });
+    // Agrupación de columnas de meses (outline nivel 1, ocultas) para poder desplegar en Excel.
+    var colsXml = "", outlineCol = 0;
+    if (opts && opts.group) {
+      var ini = null;
+      for (var g = 0; g <= maxCol; g++) {
+        if (mesCols[g]) { if (ini === null) ini = g; }
+        else if (ini !== null) { colsXml += '<col min="' + (ini + 1) + '" max="' + g + '" width="9" outlineLevel="1" hidden="1"/>'; ini = null; }
+      }
+      if (ini !== null) colsXml += '<col min="' + (ini + 1) + '" max="' + maxCol + '" width="9" outlineLevel="1" hidden="1"/>';
+      if (colsXml) outlineCol = 1;
+    }
     var _STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       (numFmts.length ? '<numFmts count="' + numFmts.length + '">' + numFmts.join("") + "</numFmts>" : "") +
@@ -566,8 +582,14 @@
       '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
       '<cellXfs count="' + xfs.length + '">' + xfs.join("") + "</cellXfs>" +
       '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    var mergesXml = merges.length ? '<mergeCells count="' + merges.length + '">' +
+      merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join("") + '</mergeCells>' : "";
     var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + xml + "</sheetData></worksheet>";
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      (outlineCol ? '<sheetPr><outlinePr summaryRight="1"/></sheetPr>' : "") +
+      (outlineCol ? '<sheetFormatPr defaultRowHeight="15" outlineLevelCol="1"/>' : "") +
+      (colsXml ? "<cols>" + colsXml + "</cols>" : "") +
+      "<sheetData>" + xml + "</sheetData>" + mergesXml + "</worksheet>";
     var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +

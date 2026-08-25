@@ -48,7 +48,11 @@
   td.num { font-variant-numeric:tabular-nums; }
   td.tot, th.tot { border-left:2px solid var(--line); font-weight:600; }
   .mes { }  table.solo-anual td.mes, table.solo-anual th.mes { display:none; }
+  /* La diferencia va en ancho fijo a la derecha; las celdas sin diferencia llevan un hueco
+     vacío del mismo ancho para alinear todos los importes. El botón oculta la columna de
+     diferencias (con .sin-dif se colapsan los huecos y quedan los importes limpios). */
   .delta { display:inline-block; width:104px; text-align:left; margin-left:6px; font-size:9.5px; white-space:nowrap; }
+  #tR.sin-dif .delta { display:none; }
   .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
   input.c { width:52px; font:inherit; font-size:11.5px; text-align:right; padding:2px 4px;
     border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
@@ -68,7 +72,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=11"></script><script src="shg-cloud.js?v=11"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=12"></script><script src="shg-cloud.js?v=12"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -126,6 +130,7 @@
       <div class="ctl"><label>% Vacaciones</label><input type="number" id="pVac" step="0.5"></div>
       <div class="ctl"><label>% Eventos</label><input type="number" id="pEve" step="0.5"></div>
       <button class="btn" id="compR">Comprimir meses</button>
+      <button class="btn on" id="btnDif" title="Muestra u oculta las diferencias y % (Forecast)">Ocultar diferencias</button>
       <span id="savedHint" style="font-size:11.5px;color:var(--res);align-self:center;transition:opacity .4s;"></span>
       <div class="ctl" style="margin-left:auto"><label>Referencia de FTE</label><select id="refBase"><option value="fc">Forecast 2026</option><option value="prev">Año anterior</option></select></div>
     </div>
@@ -232,14 +237,15 @@ function celD(v, r, fmt){ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`; if(r!=nul
   h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } return h; }
 
 function writeResumen(c, r){
-  const set = (id, serie, refserie, delta, fmt)=>{ fmt=fmt||n0; serie.forEach((v,i)=>{ const e=$(id+"-"+i); if(e){ e.innerHTML= delta&&refserie?celD(v,refserie[i],fmt):fmt(v);} });
-    const t=$(id+"-t"); if(t) t.innerHTML = delta&&refserie?celD(sum(serie),sum(refserie),fmt):fmt(sum(serie)); };
+  const set = (id, serie, refserie, delta, fmt)=>{ fmt=fmt||n0;
+    serie.forEach((v,i)=>{ const e=$(id+"-"+i); if(e) e.innerHTML = (delta&&refserie)?celD(v,refserie[i],fmt):fmt(v)+'<span class="delta"></span>'; });
+    const t=$(id+"-t"); if(t) t.innerHTML = (delta&&refserie)?celD(sum(serie),sum(refserie),fmt):fmt(sum(serie))+'<span class="delta"></span>'; };
   set("plant", c.plant, r.plant, true);
   // filas % con input manual: escribir en los inputs
   ["abs","vac","eve"].forEach(k=>{ c[k].forEach((v,i)=>{ const e=$(k+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); e.classList.toggle("manual", manual[k][i]!=null); } });
-    const t=$(k+"-t"); if(t) t.textContent=n0(sum(c[k])); });
+    const t=$(k+"-t"); if(t) t.innerHTML=n0(sum(c[k]))+'<span class="delta"></span>'; });
   c.unif.forEach((v,i)=>{ const e=$("unif-"+i); if(e && document.activeElement!==e) e.value=n0(v); });
-  $("unif-t").textContent=n0(sum(c.unif));
+  $("unif-t").innerHTML=n0(sum(c.unif))+'<span class="delta"></span>';
   set("nemp", c.nemp, r.nemp, true, n1);
   set("total", c.total, r.total, true);
   set("sueldos", c.sueldos, r.sueldos, true);
@@ -254,7 +260,7 @@ function writeResumen(c, r){
 
 // ---- Construcción tabla resumen ----
 function meses(pfx, editable, cls){ return M.map((_,i)=> editable
-  ? `<td class="num mes ${cls||''}"><input class="c" id="${pfx}-${i}" data-p="${pfx}" data-m="${i}"></td>`
+  ? `<td class="num mes ${cls||''}"><input class="c" id="${pfx}-${i}" data-p="${pfx}" data-m="${i}"><span class="delta"></span></td>`
   : `<td class="num mes" id="${pfx}-${i}"></td>`).join(""); }
 function filaR(cls,id,label,editable){ return `<tr class="${cls}"><td class="lbl">${label}</td>`
   + meses(id, editable) + `<td class="num tot" id="${id}-t"></td></tr>`; }
@@ -309,6 +315,8 @@ $("compR").addEventListener("click",()=>{ const s1=$("tR").classList.toggle("sol
 $("addPuesto").addEventListener("click",()=>{ P.puestos.push({nombre:"Nuevo puesto",fte:Z(),sueldo:0,fteFc:Z(),sueldoFc:0,ftePrev:Z(),sueldoPrev:0}); recompute(); guardarPers(); });
 $("borrarFte").addEventListener("click",()=>{ P.puestos.forEach(p=>p.fte=Z()); recompute(); guardarPers(); });
 // Restaura los puestos y FTE iniciales del forecast (descarta ediciones/copias).
+$("btnDif").addEventListener("click",()=>{ const off=document.getElementById("tR").classList.toggle("sin-dif");
+  $("btnDif").classList.toggle("on", !off); $("btnDif").textContent = off ? "Ver diferencias" : "Ocultar diferencias"; });
 $("restaurarFc").addEventListener("click",()=>{
   if(!confirm("¿Volver a los puestos y FTE iniciales del forecast?\n\nSe descartan las ediciones y copias de este hotel.")) return;
   P.puestos = PUESTOS_FC.map(p => ({ nombre:p.nombre, fte:p.fteFc.slice(), sueldo:p.sueldoFc,

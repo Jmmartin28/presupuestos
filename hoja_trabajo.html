@@ -87,6 +87,9 @@
   .mR,.mF,.mP { display:none; }
   table.vR .mR, table.vF .mF, table.vP .mP { display:table-cell; }
   .delta { display:inline-block; width:104px; text-align:left; margin-left:6px; font-size:9.5px; white-space:nowrap; }
+  .delta:empty { display:none; }
+  .delta.dfc { display:none; }               /* dif. Forecast vs año anterior: oculta por defecto */
+  #t.show-fc .delta.dfc { display:inline-block; }
   .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
   tr.detalle { display:none; } tr.detalle.visible { display:table-row; }
   tr.detalle td.lbl { padding-left:26px; font-weight:400; }
@@ -119,7 +122,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=11"></script><script src="shg-cloud.js?v=11"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=12"></script><script src="shg-cloud.js?v=12"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -175,6 +178,7 @@
       <div class="ctl"><label>Hotel (trabajando)</label><select id="selHotel"></select></div>
       <button class="btn" id="toggleAll">Desplegar partidas</button>
       <button class="btn" id="btnIncr" title="Incrementa las partidas solo de este hotel">Incrementos del hotel ▾</button>
+      <button class="btn" id="btnDifFc" title="Muestra u oculta la diferencia y % del Forecast respecto a 2025">Dif. Forecast vs 2025</button>
       <button class="btn danger" id="btnLimpiar" title="Borra medidas e incrementos de este hotel (base del forecast)">Limpiar datos</button>
       <span id="savedHint" class="savedHint"></span>
       <div class="ctl" style="margin-left:auto"><label>Referencia de medidas</label><select id="refBase"><option value="fc">Forecast</option><option value="prev">Año anterior</option></select></div>
@@ -402,9 +406,9 @@ function setEsc(pfx, serie){ // real/fcast: meses + total (sin delta)
   serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e) e.textContent=cel(v); });
   const t=$(pfx+"-t"); if(t) t.textContent=cel(sum(serie));
 }
-function setEscD(pfx, serie, refSerie, mm){ // como setEsc pero el total lleva Δ vs refSerie
+function setEscD(pfx, serie, refSerie, mm){ // como setEsc pero el total lleva Δ (Forecast vs año anterior)
   serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e) e.textContent=cel(v); });
-  const t=$(pfx+"-t"); if(t) t.innerHTML=celD(sum(serie), sum(refSerie), mm);
+  const t=$(pfx+"-t"); if(t) t.innerHTML=celD(sum(serie), sum(refSerie), mm).replace('class="delta','class="delta dfc');
 }
 function setPpto(pfx, serie, refSerie, mm){ // ppto: meses (input) + total (con delta)
   serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); } });
@@ -557,6 +561,8 @@ $("btnIncr").addEventListener("click", ()=>{
   $("btnIncr").textContent = "Incrementos del hotel " + (abrir ? "▴" : "▾");
   if(abrir) pintarIncPanel();
 });
+// Muestra/oculta la diferencia y % del Forecast vs año anterior (el Δ del Ppto queda fijo).
+$("btnDifFc").addEventListener("click", ()=>{ const on=$("t").classList.toggle("show-fc"); $("btnDifFc").classList.toggle("on", on); });
 // Limpiar TODOS los datos del hotel activo (medidas + incrementos) → base del forecast.
 $("btnLimpiar").addEventListener("click", ()=>{
   const v=activeVersion();
