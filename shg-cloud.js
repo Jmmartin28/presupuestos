@@ -488,49 +488,84 @@
     var end = new Uint8Array([].concat([0x50, 0x4b, 0x05, 0x06], u16(0), u16(0), u16(files.length), u16(files.length), u32(cd.length), u32(off), u16(0)));
     return new Blob([_cat(local), cd, end], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   }
-  // s: 0 texto · 1 cabecera · 2 número · 3 número total · 4 texto total · 5 texto dcha
-  var _STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-    '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>' +
-    '<fonts count="3"><font><sz val="10"/><name val="Calibri"/></font>' +
-    '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
-    '<font><b/><sz val="10"/><name val="Calibri"/></font></fonts>' +
-    '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
-    '<fill><patternFill patternType="solid"><fgColor rgb="FF34618E"/></patternFill></fill>' +
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFEAF1F8"/></patternFill></fill></fills>' +
-    '<borders count="1"><border><left/><right/><top/><bottom style="thin"><color rgb="FFDDDDDD"/></bottom><diagonal/></border></borders>' +
-    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-    '<cellXfs count="6">' +
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyBorder="1"/>' +
-    '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyBorder="1"><alignment horizontal="center"/></xf>' +
-    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyBorder="1" applyNumberFormat="1"><alignment horizontal="right"/></xf>' +
-    '<xf numFmtId="164" fontId="2" fillId="3" borderId="0" applyBorder="1" applyNumberFormat="1"><alignment horizontal="right"/></xf>' +
-    '<xf numFmtId="0" fontId="2" fillId="3" borderId="0" applyBorder="1"/>' +
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyBorder="1"><alignment horizontal="right"/></xf>' +
-    '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
-  var _EMPH = /\b(tI|tG|tP|tE|tR|total|totalfc|totalfte|plant|ventas|rep|sec)\b/;
+  // Color computado (rgb/rgba) -> ARGB "FFRRGGBB"; null si es transparente.
+  function _argb(c) {
+    var m = String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/); if (!m) return null;
+    if (m[4] !== undefined && parseFloat(m[4]) === 0) return null;
+    var h = function (n) { n = (+n).toString(16); return n.length < 2 ? "0" + n : n; };
+    return ("FF" + h(m[1]) + h(m[2]) + h(m[3])).toUpperCase();
+  }
+  // Texto de celda -> número + formato (con sufijo € / % / pp) o texto.
+  function _parseCell(txt) {
+    txt = (txt || "").trim(); if (!txt) return { text: "" };
+    var suf = /%/.test(txt) ? "%" : (/€/.test(txt) ? "€" : (/\d\s*pp\b/.test(txt) ? "pp" : ""));
+    var t = txt.replace(/%|€|pp/g, "").replace(/\s/g, "");
+    if (/[a-zA-Z]/.test(t) || t === "" || t === "-" || !/^-?[\d.]*(,\d+)?$/.test(t)) return { text: txt };
+    var n = parseFloat(t.replace(/\./g, "").replace(",", ".")); if (isNaN(n)) return { text: txt };
+    var fmt = (t.indexOf(",") >= 0 ? "#,##0.0" : "#,##0");
+    if (suf === "%") fmt += "&quot;%&quot;"; else if (suf === "€") fmt += "&quot; €&quot;"; else if (suf === "pp") fmt += "&quot; pp&quot;";
+    return { num: n, fmt: fmt };
+  }
   function exportarExcel(tabla, nombre) {
     var el = typeof tabla === "string" ? document.getElementById(tabla) : tabla;
     if (!el) return;
-    var clon = el.cloneNode(true);
-    clon.querySelectorAll(".delta, .pctv, .cx").forEach(function (s) { s.remove(); });
-    clon.querySelectorAll("input").forEach(function (inp) { var td = inp.closest("td"); if (td) td.textContent = inp.value; });
-    var filas = [].slice.call(clon.querySelectorAll("tr")), xml = "", nf = 0;
+    // Estilos dinámicos: replican los colores reales del informe (relleno, texto, negrita).
+    var fonts = ['<font><sz val="10"/><name val="Calibri"/></font>'], fontKey = { "|0": 0 };
+    var fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'], fillKey = {};
+    var numFmts = [], numKey = {}, nextNum = 164;
+    var xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'], xfKey = {};
+    function fontId(color, bold) {
+      var k = (color || "") + "|" + (bold ? 1 : 0); if (fontKey[k] != null) return fontKey[k];
+      fonts.push("<font>" + (bold ? "<b/>" : "") + '<sz val="10"/>' + (color ? '<color rgb="' + color + '"/>' : "") + '<name val="Calibri"/></font>');
+      return fontKey[k] = fonts.length - 1;
+    }
+    function fillId(bg) {
+      if (!bg) return 0; if (fillKey[bg] != null) return fillKey[bg];
+      fills.push('<fill><patternFill patternType="solid"><fgColor rgb="' + bg + '"/></patternFill></fill>');
+      return fillKey[bg] = fills.length - 1;
+    }
+    function numId(fmt) {
+      if (!fmt) return 0; if (numKey[fmt] != null) return numKey[fmt];
+      var id = nextNum++; numFmts.push('<numFmt numFmtId="' + id + '" formatCode="' + fmt + '"/>'); return numKey[fmt] = id;
+    }
+    function xfId(fi, fl, nm, align) {
+      var k = fi + "|" + fl + "|" + nm + "|" + align; if (xfKey[k] != null) return xfKey[k];
+      xfs.push('<xf numFmtId="' + nm + '" fontId="' + fi + '" fillId="' + fl + '" borderId="0" applyBorder="1"' +
+        (nm ? ' applyNumberFormat="1"' : "") + (fi ? ' applyFont="1"' : "") + (fl ? ' applyFill="1"' : "") +
+        '><alignment horizontal="' + align + '"/></xf>');
+      return xfKey[k] = xfs.length - 1;
+    }
+    var filas = [].slice.call(el.querySelectorAll("tr")), xml = "", nf = 0;
     filas.forEach(function (tr) {
-      var celdas = [].slice.call(tr.querySelectorAll("td,th")); if (!celdas.length) return;
+      var celdas = [].slice.call(tr.children).filter(function (c) { return c.tagName === "TD" || c.tagName === "TH"; });
+      if (!celdas.length) return;
       var esCab = tr.parentNode && tr.parentNode.tagName === "THEAD";
-      var emph = _EMPH.test(tr.className);
       nf += 1; xml += '<row r="' + nf + '">';
       celdas.forEach(function (cel, ci) {
-        var ref = _colName(ci) + nf, txt = (cel.textContent || "").trim();
-        if (esCab) { xml += '<c r="' + ref + '" s="1" t="inlineStr"><is><t>' + _xmlesc(txt) + "</t></is></c>"; return; }
-        var esLbl = cel.classList.contains("lbl") || ci === 0;
-        var n = esLbl ? null : _num(txt);
-        if (n !== null) { xml += '<c r="' + ref + '" s="' + (emph ? 3 : 2) + '"><v>' + n + "</v></c>"; }
-        else { var s = esLbl ? (emph ? 4 : 0) : 5; xml += '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t>' + _xmlesc(txt) + "</t></is></c>"; }
+        var ref = _colName(ci) + nf, cs = getComputedStyle(cel);
+        var bg = _argb(cs.backgroundColor), col = _argb(cs.color);
+        var bold = (+cs.fontWeight) >= 600 || cs.fontWeight === "bold";
+        var inp = cel.querySelector("input"), txt;
+        if (inp) { txt = inp.value; }
+        else { var cc = cel.cloneNode(true); cc.querySelectorAll(".delta,.pctv,.cx").forEach(function (x) { x.remove(); }); txt = (cc.textContent || "").trim(); }
+        var esLbl = cel.classList.contains("lbl") || (ci === 0 && !esCab);
+        var p = (esCab || esLbl) ? { text: txt } : _parseCell(txt);
+        var align = esCab ? "center" : (p.num != null ? "right" : (esLbl ? "left" : "right"));
+        var s = xfId(fontId(col, bold || esCab), fillId(bg), (p.num != null ? numId(p.fmt) : 0), align);
+        if (p.num != null) xml += '<c r="' + ref + '" s="' + s + '"><v>' + p.num + "</v></c>";
+        else xml += '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t>' + _xmlesc(txt) + "</t></is></c>";
       });
       xml += "</row>";
     });
+    var _STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      (numFmts.length ? '<numFmts count="' + numFmts.length + '">' + numFmts.join("") + "</numFmts>" : "") +
+      '<fonts count="' + fonts.length + '">' + fonts.join("") + "</fonts>" +
+      '<fills count="' + fills.length + '">' + fills.join("") + "</fills>" +
+      '<borders count="1"><border><left/><right/><top/><bottom style="thin"><color rgb="FFDDDDDD"/></bottom><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="' + xfs.length + '">' + xfs.join("") + "</cellXfs>" +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
     var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + xml + "</sheetData></worksheet>";
     var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
