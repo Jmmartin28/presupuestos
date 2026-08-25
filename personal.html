@@ -9,7 +9,7 @@
     --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
     --neg:#c0392b; --manual:#c8862a; --manual-bg:#fbf3e3; --fte-bg:#fdf6e3;
     --ing:#157347; --gas:#34618e; --gas-bg:#eaf1f8; --res:#0f766e; --res-bg:#e5f1ef; --acc:#0f766e; --acc-bg:#e5f1ef;
-    --tcf:#7c4dbf; --tcf-bg:#f1e9fb; --tfte:#b9722a; --tfte-bg:#f7efe1;
+    --tcf:#7c4dbf; --tcf-bg:#f1e9fb; --tfte:#b9722a; --tfte-bg:#f7efe1; --tc:#c0392b; --tc-bg:#fbe9e8;
     --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -17,7 +17,7 @@
       --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d;
       --neg:#ff6b5e; --manual:#e0a566; --manual-bg:#33291a; --fte-bg:#2a2413;
       --ing:#4ac07e; --gas:#6ea8dc; --gas-bg:#152634; --res:#4fd1c5; --res-bg:#14312e; --acc:#4fd1c5; --acc-bg:#14312e;
-      --tcf:#b79be6; --tcf-bg:#241a3a; --tfte:#e0a566; --tfte-bg:#312819;
+      --tcf:#b79be6; --tcf-bg:#241a3a; --tfte:#e0a566; --tfte-bg:#312819; --tc:#ff8f84; --tc-bg:#3a1c1b;
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
     }
   }
@@ -48,15 +48,17 @@
   td.num { font-variant-numeric:tabular-nums; }
   td.tot, th.tot { border-left:2px solid var(--line); font-weight:600; }
   .mes { }  table.solo-anual td.mes, table.solo-anual th.mes { display:none; }
-  .delta { display:inline-block; margin-left:5px; font-size:9.5px; }
+  .delta { display:block; margin-left:0; font-size:9.5px; line-height:1.15; }
   .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
   input.c { width:52px; font:inherit; font-size:11.5px; text-align:right; padding:2px 4px;
     border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
   input.c.manual { background:var(--manual-bg); color:var(--manual); font-weight:600; border-color:var(--manual); }
   td.fte input.c { background:var(--fte-bg); }
   .ref { display:block; font-size:9px; color:var(--muted); }
-  tr.plant td, tr.total td { font-weight:700; background:var(--gas-bg); }
-  tr.plant td.lbl, tr.total td.lbl { color:var(--gas); background:var(--gas-bg); }
+  tr.plant td { font-weight:700; background:var(--gas-bg); }
+  tr.plant td.lbl { color:var(--gas); background:var(--gas-bg); }
+  tr.total td { font-weight:800; font-size:14px; background:var(--tc-bg); }
+  tr.total td.lbl { color:var(--tc); background:var(--tc-bg); }
   tr.rep td { font-weight:700; background:var(--acc-bg); } tr.rep td.lbl { color:var(--acc); background:var(--acc-bg); }
   tr.totalfc td { font-weight:700; background:var(--tcf-bg); } tr.totalfc td.lbl { color:var(--tcf); background:var(--tcf-bg); }
   tr.totalfte td { font-weight:700; background:var(--tfte-bg); } tr.totalfte td.lbl { color:var(--tfte); background:var(--tfte-bg); }
@@ -66,7 +68,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=10"></script><script src="shg-cloud.js?v=10"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=11"></script><script src="shg-cloud.js?v=11"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
