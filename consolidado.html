@@ -68,7 +68,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=9"></script><script src="shg-cloud.js?v=9"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("consolidado");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=10"></script><script src="shg-cloud.js?v=10"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("consolidado");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -151,7 +151,10 @@ function permitido(h){ return !(window.SHG && SHG.sesion && SHG.sesion()) ? true
 function calcHOT(){ return D.hoteles.slice().filter(h=> hotelIncluido(h.id) && permitido(h)).sort((a,b)=> (a.hotelera-b.hotelera) || a.nombre.localeCompare(b.nombre)); }
 let HOT = calcHOT();
 function incFrac(cat, idHotel){ const v=activeVersion(); if(!v||!cat) return 0;
-  const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
+  const o=(v.overrides&&v.overrides[idHotel])||{};
+  if(cat in o) return o[cat];                                   // 1º hoja de trabajo (si se fijó)
+  if(cat==="alojamiento"){ const a=v.alojamiento&&v.alojamiento[idHotel]; const inc=a&&+a.incIng; if(inc) return inc/100; }  // 2º % ADR de Alojamiento
+  return (v.incrementos&&v.incrementos[cat])||0; }              // 3º general de Inicio
 // Mes de corte (auditoría) de la versión: null = automático por hotel (forecast horneado);
 // número 0-12 = corte uniforme (real hasta ese mes incluido, presupuesto después).
 function mesCorte(){ const v=activeVersion(); return v && typeof v.mesAuditado==="number" ? v.mesAuditado : null; }
@@ -280,7 +283,7 @@ function render(){
 $("cab").addEventListener("click", e=>{ const cx=e.target.closest(".cx"); if(!cx) return; exp[cx.dataset.k]=!exp[cx.dataset.k]; render(); });
 $("expAll").addEventListener("click",()=>{ columnas().forEach(c=> exp[c.key]=true); render(); });
 $("compAll").addEventListener("click",()=>{ Object.keys(exp).forEach(k=> exp[k]=false); render(); });
-$("expExcel").addEventListener("click",()=>alert("El Excel consolidado (formato Presupuesto 2027) se genera junto a esta página: Presupuesto2027_Consolidado_*.xlsx en la carpeta outputs. En la app se descargará con la selección actual."));
+$("expExcel").addEventListener("click",()=>{ if(window.SHG&&SHG.exportarExcel) SHG.exportarExcel("t","Consolidado_"+D.anio); });
 
 pintarSel(); actualizarBtn(); render();
 // Cuando la puerta resuelve los permisos, re-filtra los hoteles y re-render.

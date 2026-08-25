@@ -119,7 +119,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=9"></script><script src="shg-cloud.js?v=9"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=10"></script><script src="shg-cloud.js?v=10"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -258,16 +258,19 @@ function activeVersion(){
     const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
     return act && vs[act] ? vs[act] : null; } catch(e){ return null; }
 }
-function incPct(cat){                       // % de incremento de una categoría (override hotel o general)
-  const v=activeVersion(); if(!v||!cat) return 0;
-  const o=(v.overrides && v.overrides[D.idHotel]) || {};
-  const f=(cat in o) ? o[cat] : (v.incrementos ? v.incrementos[cat] : 0);
-  return (f||0)*100;
+// Incremento efectivo por categoría con prioridad: 1º hoja de trabajo (override), 2º %
+// ADR de la página de Alojamiento (solo la categoría alojamiento), 3º general de Inicio.
+function incInfo(cat, hotelId){
+  const v=activeVersion(); if(!v||!cat) return {frac:0, src:null};
+  const o=(v.overrides&&v.overrides[hotelId])||{};
+  if(cat in o) return {frac:o[cat], src:"hoja"};
+  if(cat==="alojamiento"){ const a=v.alojamiento&&v.alojamiento[hotelId]; const inc=a&&+a.incIng; if(inc) return {frac:inc/100, src:"aloj"}; }
+  return {frac:(v.incrementos&&v.incrementos[cat])||0, src:"gen"};
 }
+function incPct(cat){ return incInfo(cat, D.idHotel).frac*100; }
 // --- Central (SHG): ingreso MF (Ppto) = Σ del coste de MF de las hoteleras ---
 function esCentralActual(){ const h=D.hoteles.find(x=>x.id===D.idHotel); return !!(h && h.esCentral); }
-function _incFracHotel(cat, hotelId){ const v=activeVersion(); if(!v||!cat) return 0;
-  const o=(v.overrides&&v.overrides[hotelId])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
+function _incFracHotel(cat, hotelId){ return incInfo(cat, hotelId).frac; }
 function _mgmtFeesFcMes(hotelId){ const dv=D.porHotel[hotelId]; if(!dv) return Z();
   const g=(dv.grupos||[]).find(g=>g.catClave==="management_fees"); if(!g) return Z();
   const acc=Z(); (g.detalle||[]).forEach(d=>{ const fm=d.fcMes||[]; for(let m=0;m<12;m++) acc[m]+=fm[m]||0; }); return acc; }
@@ -399,6 +402,10 @@ function setEsc(pfx, serie){ // real/fcast: meses + total (sin delta)
   serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e) e.textContent=cel(v); });
   const t=$(pfx+"-t"); if(t) t.textContent=cel(sum(serie));
 }
+function setEscD(pfx, serie, refSerie, mm){ // como setEsc pero el total lleva Δ vs refSerie
+  serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e) e.textContent=cel(v); });
+  const t=$(pfx+"-t"); if(t) t.innerHTML=celD(sum(serie), sum(refSerie), mm);
+}
 function setPpto(pfx, serie, refSerie, mm){ // ppto: meses (input) + total (con delta)
   serie.forEach((v,i)=>{ const e=$(pfx+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); } });
   const t=$(pfx+"-t"); if(t) t.innerHTML=celD(sum(serie), sum(refSerie), mm);
@@ -406,11 +413,11 @@ function setPpto(pfx, serie, refSerie, mm){ // ppto: meses (input) + total (con 
 function writeValues(){
   const rb=RB();
   D.grupos.forEach((g,gi)=>{
-    setEsc("R-g"+gi, escGrupo(g,"prevMes")); setEsc("F-g"+gi, escGrupo(g,"fcMes"));
+    setEsc("R-g"+gi, escGrupo(g,"prevMes")); setEscD("F-g"+gi, escGrupo(g,"fcMes"), escGrupo(g,"prevMes"), g.ingreso);
     const t=$("P-g"+gi+"-t"); if(t) t.innerHTML=celD(sum(g._m), sum(escGrupo(g,"fcMes")), g.ingreso);
     g._m.forEach((v,i)=>{ const e=$("P-g"+gi+"-"+i); if(e) e.textContent=cel(v); });
     g.detalle.forEach((d,di)=>{
-      setEsc("R-"+gi+"-"+di, d.prevMes); setEsc("F-"+gi+"-"+di, d.fcMes);
+      setEsc("R-"+gi+"-"+di, d.prevMes); setEscD("F-"+gi+"-"+di, d.fcMes, d.prevMes, g.ingreso);
       setPpto("P-"+gi+"-"+di, d._m, d.fcMes, g.ingreso);   // Δ SIEMPRE vs forecast
       d.manual.forEach((mv,i)=>{ const e=$("P-"+gi+"-"+di+"-"+i); if(e) e.classList.toggle("manual", mv!=null); });
       const r = rb==="prev"?d.refPrev:d.refFc;
@@ -422,7 +429,7 @@ function writeValues(){
   const MM={ "w-ing":true, "w-tg":false, "w-gop":true, "w-eb":true, "w-rn":true };
   [["w-ing",_wR.ing,_wF.ing,_wP.ing],["w-tg",_wR.tg,_wF.tg,_wP.tg],["w-gop",_wR.gop,_wF.gop,_wP.gop],
    ["w-eb",_wR.eb,_wF.eb,_wP.eb],["w-rn",_wR.rn,_wF.rn,_wP.rn]].forEach(([p,r,f,pp])=>{
-    setEsc(p+"-R",r); setEsc(p+"-F",f);
+    setEsc(p+"-R",r); setEscD(p+"-F", f, r, MM[p]);   // Forecast con Δ vs 2025
     pp.forEach((v,i)=>{ const e=$(p+"-P-"+i); if(e) e.textContent=cel(v); });
     const t=$(p+"-P-t"); if(t) t.innerHTML=celD(sum(pp), sum(f), MM[p]);   // Δ vs forecast
   });
@@ -510,8 +517,9 @@ function pintarVinc(){
   const v=activeVersion(), cont=$("vinc");
   if(!v){ cont.innerHTML='<span class="vlbl">Incrementos de la versión</span><span class="chip">Sin versión activa · Ppto = forecast</span>'; return; }
   const fmt=x=> (x>0?'+':'')+(Math.round(x*10)/10).toLocaleString('es-ES')+'%';
-  const chips=D.grupos.map(g=>{ const p=incPct(g.catClave); if(!p) return "";
-    return `<span class="chip ${g.ingreso?'ing':'gas'}" title="${g.nombre}">${g.nombre} ${fmt(p)}</span>`; }).filter(Boolean).join("");
+  const SRC={hoja:"hoja", aloj:"ADR aloj.", gen:"general"};
+  const chips=D.grupos.map(g=>{ const info=incInfo(g.catClave, D.idHotel); const p=info.frac*100; if(!p) return "";
+    return `<span class="chip ${g.ingreso?'ing':'gas'}" title="${g.nombre} · fuente: ${SRC[info.src]||''}">${g.nombre} ${fmt(p)} · ${SRC[info.src]||''}</span>`; }).filter(Boolean).join("");
   cont.innerHTML=`<span class="vlbl">Incrementos · ${v.nombre}</span>` + (chips || '<span class="chip">todos 0% · Ppto = forecast</span>');
 }
 

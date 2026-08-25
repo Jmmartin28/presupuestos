@@ -9,6 +9,7 @@
     --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
     --neg:#c0392b; --manual:#c8862a; --manual-bg:#fbf3e3; --fte-bg:#fdf6e3;
     --ing:#157347; --gas:#34618e; --gas-bg:#eaf1f8; --res:#0f766e; --res-bg:#e5f1ef; --acc:#0f766e; --acc-bg:#e5f1ef;
+    --tcf:#7c4dbf; --tcf-bg:#f1e9fb; --tfte:#b9722a; --tfte-bg:#f7efe1;
     --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -16,6 +17,7 @@
       --bg:#0f141b; --panel:#161c26; --ink:#e7ecf3; --muted:#93a0b4; --line:#26303d;
       --neg:#ff6b5e; --manual:#e0a566; --manual-bg:#33291a; --fte-bg:#2a2413;
       --ing:#4ac07e; --gas:#6ea8dc; --gas-bg:#152634; --res:#4fd1c5; --res-bg:#14312e; --acc:#4fd1c5; --acc-bg:#14312e;
+      --tcf:#b79be6; --tcf-bg:#241a3a; --tfte:#e0a566; --tfte-bg:#312819;
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
     }
   }
@@ -56,13 +58,15 @@
   tr.plant td, tr.total td { font-weight:700; background:var(--gas-bg); }
   tr.plant td.lbl, tr.total td.lbl { color:var(--gas); background:var(--gas-bg); }
   tr.rep td { font-weight:700; background:var(--acc-bg); } tr.rep td.lbl { color:var(--acc); background:var(--acc-bg); }
+  tr.totalfc td { font-weight:700; background:var(--tcf-bg); } tr.totalfc td.lbl { color:var(--tcf); background:var(--tcf-bg); }
+  tr.totalfte td { font-weight:700; background:var(--tfte-bg); } tr.totalfte td.lbl { color:var(--tfte); background:var(--tfte-bg); }
   td.pctcol { border-left:1px solid var(--line); background:var(--bg); }
   .del { color:var(--neg); cursor:pointer; margin-right:6px; font-weight:700; }
   footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=9"></script><script src="shg-cloud.js?v=9"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=10"></script><script src="shg-cloud.js?v=10"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -129,12 +133,13 @@
     <div style="margin:6px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
       <button class="btn" id="addPuesto">+ Añadir puesto</button>
       <button class="btn" id="borrarFte">Borrar FTE</button>
+      <button class="btn" id="restaurarFc" title="Vuelve a los puestos y FTE iniciales del forecast">Forecast</button>
       <span style="flex:1"></span>
       <label style="font-size:11px;color:var(--muted)">Copiar puestos de</label>
       <select id="copiaHotel" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit"></select>
       <button class="btn" id="copiar" disabled>Copiar</button>
     </div>
-    <div class="card" style="max-height:40vh"><table id="tP"><thead><tr id="cabP"></tr></thead><tbody id="cuerpoP"></tbody></table></div>
+    <div class="card" style="max-height:64vh"><table id="tP"><thead><tr id="cabP"></tr></thead><tbody id="cuerpoP"></tbody></table></div>
     <footer>App de Presupuestos SHG · página de Personal · Sueldos = 70% · Seguros Sociales = 30% · Uniformidad → Uniformes</footer>
   </div>
 <script>
@@ -162,6 +167,10 @@ $("pAbs").value = (P.pct.absentismo*100).toFixed(1);
 $("pVac").value = (P.pct.vacaciones*100).toFixed(1);
 $("pEve").value = (P.pct.eventos*100).toFixed(1);
 P.puestos.forEach(p => { p.fte = p.fteFc.slice(); p.sueldo = p.sueldoFc; });   // arranca del forecast
+// Snapshot de los puestos originales del forecast (para el botón "Forecast": restaura
+// aunque se hayan borrado FTE, copiado de otra empresa, o añadido/quitado puestos).
+const PUESTOS_FC = P.puestos.map(p => ({ nombre:p.nombre, fteFc:(p.fteFc||[]).slice(),
+  sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
 const unifManual = P.unifFc.slice();
 const manual = { abs:Z().map(()=>null), vac:Z().map(()=>null), eve:Z().map(()=>null) };
 
@@ -236,6 +245,9 @@ function writeResumen(c, r){
   set("uniformes", c.uniformes, r.uniformes, true);
   // Total FTE mensual (Σ FTE de los puestos) frente al total FTE de la referencia.
   set("ftetot", c.nemp, r.nemp, true, n1);
+  // Total Coste Forecast: coste del forecast (fijo, no cambia al editar/borrar) vs 2025.
+  const fcE = escenario("fteFc","sueldoFc", false), prevE = escenario("ftePrev","sueldoPrev", false);
+  set("totalfc", fcE.total, prevE.total, true);
 }
 
 // ---- Construcción tabla resumen ----
@@ -252,11 +264,12 @@ $("cuerpoR").innerHTML =
   + filaR("","unif","Uniformidad",true)
   + filaR("","nemp","Nº empleados (FTE)",false)
   + filaR("total","total","TOTAL COSTE",false)
+  + filaR("totalfc","totalfc","TOTAL COSTE FORECAST",false)
   + `<tr class="rep"><td class="lbl" colspan="99" style="text-align:left">Reparto a USALI</td></tr>`
   + filaR("rep","sueldos","Sueldos y salarios (70%)",false)
   + filaR("rep","segsoc","Seguros Sociales (30%)",false)
   + filaR("rep","uniformes","Uniformes",false)
-  + filaR("total","ftetot","Total FTE",false);
+  + filaR("totalfte","ftetot","Total FTE",false);
 
 // ---- Construcción tabla puestos ----
 $("cabP").innerHTML='<th class="lbl">Puesto</th>'+M.map(m=>`<th class="num mes">${m}</th>`).join("")+'<th class="num tot">Sueldo €/FTE</th>';
@@ -293,6 +306,13 @@ $("compR").addEventListener("click",()=>{ const s1=$("tR").classList.toggle("sol
   $("compR").textContent=s1?"Ver meses":"Comprimir meses"; $("compR").classList.toggle("on",s1); });
 $("addPuesto").addEventListener("click",()=>{ P.puestos.push({nombre:"Nuevo puesto",fte:Z(),sueldo:0,fteFc:Z(),sueldoFc:0,ftePrev:Z(),sueldoPrev:0}); recompute(); guardarPers(); });
 $("borrarFte").addEventListener("click",()=>{ P.puestos.forEach(p=>p.fte=Z()); recompute(); guardarPers(); });
+// Restaura los puestos y FTE iniciales del forecast (descarta ediciones/copias).
+$("restaurarFc").addEventListener("click",()=>{
+  if(!confirm("¿Volver a los puestos y FTE iniciales del forecast?\n\nSe descartan las ediciones y copias de este hotel.")) return;
+  P.puestos = PUESTOS_FC.map(p => ({ nombre:p.nombre, fte:p.fteFc.slice(), sueldo:p.sueldoFc,
+    fteFc:p.fteFc.slice(), sueldoFc:p.sueldoFc, ftePrev:p.ftePrev.slice(), sueldoPrev:p.sueldoPrev }));
+  recompute(); guardarPers();
+});
 // Copiar puestos (estructura + FTE + sueldo) de otro hotel guardado en la versión.
 $("copiaHotel").innerHTML='<option value="">Elige un hotel…</option>'
   + D.hoteles.filter(h=>h.id!==D.idHotel && hotelVisible(h)).map(h=>`<option value="${h.id}">${h.nombre}</option>`).join("");

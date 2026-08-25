@@ -77,7 +77,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=9"></script><script src="shg-cloud.js?v=9"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("alojamiento");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=10"></script><script src="shg-cloud.js?v=10"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("alojamiento");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -235,23 +235,33 @@ function calc(cls,id,label){ return `<tr class="calc ${cls}"><td class="lbl">${l
 function inp(key,label,fmt,init){ const a = init || S[key]; return `<tr class="inp inp-${key}"><td class="lbl">${label}</td>`
   + M.map((_,i)=>`<td class="icell mes"><input class="c" data-k="${key}" data-m="${i}" value="${fmt(a[i])}"><span class="delta" id="${key}-${i}d"></span></td>`).join("")
   + `<td class="num tot"><span class="amt" id="${key}-t"></span><span class="delta" id="${key}-td"></span></td></tr>`; }
+// Fila de referencia con Δ (importe y %, o simple) frente a otra serie. Se usa en las
+// líneas de Forecast 2026 para mostrar la diferencia respecto al Real 2025.
+const dImpPct=(dv,base)=>{ const p=Math.abs(base)>0.5?dv/Math.abs(base)*100:0;
+  return `<span class="delta ${dv>=0?'up':'down'}">${dv>=0?'+':''}${n0(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; };
+const dFmt=fmt=>(dv)=>`<span class="delta ${dv>=0?'up':'down'}">${dv>=0?'+':''}${fmt(dv)}</span>`;
+function refD(label,arr,fmt,tot,refArr,totRef,dfn){
+  return `<tr class="ref"><td class="lbl">${label}</td>`
+    + arr.map((v,i)=>`<td class="num mes">${fmt(v)}${dfn(v-(refArr[i]||0),refArr[i]||0)}</td>`).join("")
+    + `<td class="num tot">${fmt(tot)}${dfn(tot-totRef,totRef)}</td></tr>`;
+}
 
 $("cuerpo").innerHTML =
   `<tr class="sec"><td colspan="99">Ventas de alojamiento (€)</td></tr>`
   + ref("Real 2025", D.v25, n0, sum(D.v25))
-  + ref("Forecast 2026", D.v26, n0, sum(D.v26))
+  + refD("Forecast 2026", D.v26, n0, sum(D.v26), D.v25, sum(D.v25), dImpPct)
   + calc("ventas","v27","Ppto 2027")
   + `<tr class="sec"><td colspan="99">Ocupación y ADR</td></tr>`
   + inp("dias","Días 2027", n0)
   + calc("","disp27","Disponibilidad 2027")
   + ref("Ocupación nº 2025", D.ocu25, n0, sum(D.ocu25))
-  + ref("Ocupación nº 2026", D.ocu26, n0, sum(D.ocu26))
+  + refD("Ocupación nº 2026", D.ocu26, n0, sum(D.ocu26), D.ocu25, sum(D.ocu25), dFmt(n0))
   + inp("ocu","Ocupación nº 2027", n0)
   + ref("Ocupación % 2025", D.pct25, pctS, wpct(D.ocu25,D.disp25))
-  + ref("Ocupación % 2026", D.pct26, pctS, wpct(D.ocu26,D.disp26))
+  + refD("Ocupación % 2026", D.pct26, pctS, wpct(D.ocu26,D.disp26), D.pct25, wpct(D.ocu25,D.disp25), dFmt(x=>n1(x)+" pp"))
   + inp("pct","Ocupación % 2027", n1, pct())
   + ref("ADR 2025", D.adr25, eur, wadr(D.v25,D.ocu25))
-  + ref("ADR 2026", D.adr26, eur, wadr(D.v26,D.ocu26))
+  + refD("ADR 2026", D.adr26, eur, wadr(D.v26,D.ocu26), D.adr25, wadr(D.v25,D.ocu25), dFmt(eur))
   + inp("adr","ADR 2027", n1);
 
 function setInput(k, i, txt){

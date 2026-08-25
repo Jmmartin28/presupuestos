@@ -71,7 +71,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=9"></script><script src="shg-cloud.js?v=9"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("comparativo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=10"></script><script src="shg-cloud.js?v=10"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("comparativo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -135,6 +135,7 @@
       <button class="btn" id="swap">⇄ Intercambiar</button>
       <button class="btn" id="expAll">Expandir meses</button>
       <button class="btn" id="compAll">Comprimir</button>
+      <button class="btn" id="btnExcel">Exportar a Excel</button>
     </div>
     <div class="card"><table id="t"><thead id="cab"></thead><tbody id="cuerpo"></tbody></table></div>
     <footer>App de Presupuestos SHG · informe comparativo · las entidades disponibles dependen de la versión activa y de tus permisos</footer>
@@ -171,7 +172,10 @@ function permitido(h){ return !(window.SHG && SHG.sesion && SHG.sesion()) ? true
 function calcHOT(){ return D.hoteles.slice().filter(h=> hotelIncluido(h.id) && permitido(h)).sort((a,b)=> (a.hotelera-b.hotelera) || a.nombre.localeCompare(b.nombre)); }
 let HOT = calcHOT();
 function incFrac(cat, idHotel){ const v=activeVersion(); if(!v||!cat) return 0;
-  const o=(v.overrides&&v.overrides[idHotel])||{}; return (cat in o)?o[cat]:((v.incrementos&&v.incrementos[cat])||0); }
+  const o=(v.overrides&&v.overrides[idHotel])||{};
+  if(cat in o) return o[cat];                                   // 1º hoja de trabajo (si se fijó)
+  if(cat==="alojamiento"){ const a=v.alojamiento&&v.alojamiento[idHotel]; const inc=a&&+a.incIng; if(inc) return inc/100; }  // 2º % ADR de Alojamiento
+  return (v.incrementos&&v.incrementos[cat])||0; }              // 3º general de Inicio
 function mesCorte(){ const v=activeVersion(); return v && typeof v.mesAuditado==="number" ? v.mesAuditado : null; }
 function catMesCorte(h){
   const N=mesCorte();
@@ -247,7 +251,7 @@ function filasDeCv(cv){
 }
 
 // ---- Estado de los dos lados ----
-const lados = { A:{periodo:"fc2026", sel:{}}, B:{periodo:"ppto2027", sel:{}} };
+const lados = { A:{periodo:"ppto2027", sel:{}}, B:{periodo:"fc2026", sel:{}} };
 function initSel(){ ["A","B"].forEach(L=>{ lados[L].sel={}; HOT.forEach(h=> lados[L].sel[h.id]=true); }); }
 initSel();
 const exp = {A:false, B:false, D:false};   // despliegue por meses de cada bloque
@@ -302,6 +306,17 @@ document.addEventListener("click", e=>{ if(!e.target.closest(".dd")){ $("selA").
 
 // ---- Render de la tabla ----
 function celPct(v, tot){ return Math.abs(tot)>0.5 ? `<span class="pctv">${(v/tot*100).toFixed(1)}%</span>` : ""; }
+// Dirección "buena" de cada fila para colorear la diferencia: +1 si subir es mejor
+// (ingresos y márgenes), -1 si bajar es mejor (gastos), 0 si no se colorea.
+const _catIng = new Set(D.catIngresos);
+function dirMejora(fi, f){
+  if(f.tipo==="tI"||f.tipo==="tP"||f.tipo==="tE"||f.tipo==="tR") return 1;
+  if(f.tipo==="tG") return -1;
+  const clave=D.filasCat[fi];
+  if(!clave) return 0;
+  return _catIng.has(clave) ? 1 : -1;
+}
+function claseDif(d, dir){ if(!dir || Math.abs(d)<0.005) return ""; return (d*dir>0) ? "dpos" : "dneg"; }
 function render(){
   const A=ladoDatos("A"), B=ladoDatos("B");
   const totIA=sum(A.filas[IDX_TI]), totIB=sum(B.filas[IDX_TI]);
@@ -333,35 +348,51 @@ function render(){
     // Lado B
     if(exp.B) sb.forEach((v,m)=> body+=`<td class="num mes${m===0?' sep':''}">${n0(v)}</td>`);
     body+=`<td class="num anio tcB${exp.B?'':' sep'}"><span>${n0(tb)}</span>${celPct(tb,totIB)}</td>`;
-    // Diferencia
-    if(exp.D) sa.forEach((v,m)=>{ const d=v-sb[m]; body+=`<td class="num mes${m===0?' sep':''} ${d<0?'dneg':d>0?'dpos':''}">${n0(d)}</td>`; });
-    const cd = da<0?'dneg':da>0?'dpos':'';
+    // Diferencia (verde/rojo según convenga a la naturaleza de la fila)
+    const dir=dirMejora(fi,f);
+    if(exp.D) sa.forEach((v,m)=>{ const d=v-sb[m]; body+=`<td class="num mes${m===0?' sep':''} ${claseDif(d,dir)}">${n0(d)}</td>`; });
+    const cd = claseDif(da,dir);
     const pd = Math.abs(tb)>0.5 ? (da/Math.abs(tb)*100).toFixed(1)+"%" : "—";
     body+=`<td class="num anio tcD${exp.D?'':' sep'} ${cd}">${n0(da)}</td>`;
     body+=`<td class="num anio tcD ${cd}">${pd}</td>`;
     body+="</tr>";
   });
-  // Estadísticas (Ocupación / ADR / RevPAR) para A y B; diferencia en blanco.
+  // Estadísticas (Ocupación / ADR / RevPAR) para A y B, con su diferencia.
   const aloA=A.filas[IDX_ALO], aloB=B.filas[IDX_ALO];
-  function statRow(label, fmesA, ftotA, fmesB, ftotB){
+  const ppf=x=> (x>=0?'+':'')+n1(x)+' pp';
+  const eud=x=> (x>=0?'+':'')+n0(x)+' €';
+  const prel=(a,b)=> Math.abs(b)>0.5 ? ((a-b>=0?'+':'')+((a-b)/Math.abs(b)*100).toFixed(1)+'%') : '—';
+  const clsP=x=> x>0.005?'dpos':(x<-0.005?'dneg':'');   // más ocupación/ADR/RevPAR en A = verde
+  function statRow(label, fmesA, ftotA, fmesB, ftotB, fdifMes, fdifTot){
     let r=`<tr class="stat"><td class="lbl">${label}</td>`;
     if(exp.A) for(let m=0;m<12;m++) r+=`<td class="num mes">${fmesA(m)}</td>`;
     r+=`<td class="num anio tcA">${ftotA()}</td>`;
     if(exp.B) for(let m=0;m<12;m++) r+=`<td class="num mes${m===0?' sep':''}">${fmesB(m)}</td>`;
     r+=`<td class="num anio tcB${exp.B?'':' sep'}">${ftotB()}</td>`;
-    if(exp.D) for(let m=0;m<12;m++) r+=`<td class="num mes${m===0?' sep':''}">—</td>`;
-    r+=`<td class="num anio tcD${exp.D?'':' sep'}">—</td><td class="num anio tcD">—</td>`;
+    if(exp.D) for(let m=0;m<12;m++){ const d=fdifMes(m); r+=`<td class="num mes${m===0?' sep':''} ${d.cls}">${d.t}</td>`; }
+    const dt=fdifTot();
+    r+=`<td class="num anio tcD${exp.D?'':' sep'} ${dt.cls}">${dt.v}</td><td class="num anio tcD ${dt.cls}">${dt.p}</td>`;
     return r+"</tr>";
   }
+  const occM=(o,d,m)=> d[m]? 100*o[m]/d[m] : null, occT=(o,d)=> sum(d)? 100*sum(o)/sum(d) : null;
+  const adrM=(a,o,m)=> o[m]? a[m]/o[m] : null, adrT=(a,o)=> sum(o)? sum(a)/sum(o) : null;
+  const rpM =(a,d,m)=> d[m]? a[m]/d[m] : null, rpT =(a,d)=> sum(d)? sum(a)/sum(d) : null;
+  const difMesGen=(fa,fb,fmt)=> m=>{ const a=fa(m), b=fb(m); return (a==null||b==null)?{t:'—',cls:''}:{t:fmt(a-b),cls:clsP(a-b)}; };
   body+=statRow("Ocupación %",
     m=> A.disp[m]? n1(100*A.ocu[m]/A.disp[m])+"%":"—", ()=> sum(A.disp)? n1(100*sum(A.ocu)/sum(A.disp))+"%":"—",
-    m=> B.disp[m]? n1(100*B.ocu[m]/B.disp[m])+"%":"—", ()=> sum(B.disp)? n1(100*sum(B.ocu)/sum(B.disp))+"%":"—");
+    m=> B.disp[m]? n1(100*B.ocu[m]/B.disp[m])+"%":"—", ()=> sum(B.disp)? n1(100*sum(B.ocu)/sum(B.disp))+"%":"—",
+    difMesGen(m=>occM(A.ocu,A.disp,m), m=>occM(B.ocu,B.disp,m), ppf),
+    ()=>{ const a=occT(A.ocu,A.disp), b=occT(B.ocu,B.disp); return (a==null||b==null)?{v:'—',p:'—',cls:''}:{v:ppf(a-b),p:'—',cls:clsP(a-b)}; });
   body+=statRow("ADR €",
     m=> A.ocu[m]? n0(aloA[m]/A.ocu[m])+" €":"—", ()=> sum(A.ocu)? n0(sum(aloA)/sum(A.ocu))+" €":"—",
-    m=> B.ocu[m]? n0(aloB[m]/B.ocu[m])+" €":"—", ()=> sum(B.ocu)? n0(sum(aloB)/sum(B.ocu))+" €":"—");
+    m=> B.ocu[m]? n0(aloB[m]/B.ocu[m])+" €":"—", ()=> sum(B.ocu)? n0(sum(aloB)/sum(B.ocu))+" €":"—",
+    difMesGen(m=>adrM(aloA,A.ocu,m), m=>adrM(aloB,B.ocu,m), eud),
+    ()=>{ const a=adrT(aloA,A.ocu), b=adrT(aloB,B.ocu); return (a==null||b==null)?{v:'—',p:'—',cls:''}:{v:eud(a-b),p:prel(a,b),cls:clsP(a-b)}; });
   body+=statRow("RevPAR €",
     m=> A.disp[m]? n0(aloA[m]/A.disp[m])+" €":"—", ()=> sum(A.disp)? n0(sum(aloA)/sum(A.disp))+" €":"—",
-    m=> B.disp[m]? n0(aloB[m]/B.disp[m])+" €":"—", ()=> sum(B.disp)? n0(sum(aloB)/sum(B.disp))+" €":"—");
+    m=> B.disp[m]? n0(aloB[m]/B.disp[m])+" €":"—", ()=> sum(B.disp)? n0(sum(aloB)/sum(B.disp))+" €":"—",
+    difMesGen(m=>rpM(aloA,A.disp,m), m=>rpM(aloB,B.disp,m), eud),
+    ()=>{ const a=rpT(aloA,A.disp), b=rpT(aloB,B.disp); return (a==null||b==null)?{v:'—',p:'—',cls:''}:{v:eud(a-b),p:prel(a,b),cls:clsP(a-b)}; });
   $("cuerpo").innerHTML=body;
 }
 
@@ -369,6 +400,7 @@ $("cab").addEventListener("click", e=>{ const cx=e.target.closest(".cx"); if(!cx
 $("expAll").addEventListener("click",()=>{ exp.A=exp.B=exp.D=true; render(); });
 $("compAll").addEventListener("click",()=>{ exp.A=exp.B=exp.D=false; render(); });
 $("swap").addEventListener("click",()=>{ const t=lados.A; lados.A=lados.B; lados.B=t; pintarPeriodos(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render(); });
+$("btnExcel").addEventListener("click",()=>{ if(window.SHG&&SHG.exportarExcel) SHG.exportarExcel("t","Comparativo"); });
 
 pintarPeriodos(); pintarSel("A"); pintarSel("B"); actualizarBtn("A"); actualizarBtn("B"); render();
 // Cuando la puerta resuelve permisos, re-filtra entidades y re-render.

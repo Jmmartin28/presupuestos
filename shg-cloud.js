@@ -70,6 +70,12 @@
         await new Promise(function (s) { setTimeout(s, wait * 1000); });
         continue;
       }
+      // 409 resourceModified (eTag): otro guardado toco el item entre lectura y escritura.
+      // El PATCH de /fields es una fusion, asi que reintentar tras una pausa corta lo resuelve.
+      if (r.status === 409 && method !== "POST" && intento < 3) {
+        await new Promise(function (s) { setTimeout(s, 400 + intento * 500); });
+        continue;
+      }
       if (!r.ok) { var t = await r.text(); throw new Error("Graph " + r.status + " " + url + " :: " + t); }
       if (method === "PATCH" || method === "DELETE" || r.status === 204) return null;
       return r.json();
@@ -447,8 +453,30 @@
     return true;
   }
 
+  // Exporta la tabla visible a un .xls (HTML que Excel abre). Sin librerias externas.
+  // Limpia deltas, %/ventas y expansores, y vuelca los inputs a su valor, para que el
+  // Excel tenga celdas limpias con el dato actual de la pantalla.
+  function exportarExcel(tabla, nombre) {
+    var el = typeof tabla === "string" ? document.getElementById(tabla) : tabla;
+    if (!el) return;
+    var clon = el.cloneNode(true);
+    clon.querySelectorAll(".delta, .pctv, .cx").forEach(function (s) { s.remove(); });
+    clon.querySelectorAll("input").forEach(function (inp) {
+      var td = inp.closest("td"); if (td) td.textContent = inp.value;
+    });
+    var estilo = "table{border-collapse:collapse}td,th{border:.5pt solid #ccc;padding:2px 6px}";
+    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">' +
+      "<style>" + estilo + "</style></head><body>" + clon.outerHTML + "</body></html>";
+    var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url;
+    a.download = (nombre || "informe") + "_" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  }
+
   window.SHG = {
-    init: init, login: login, logout: logout, cuenta: cuenta,
+    init: init, login: login, logout: logout, cuenta: cuenta, exportarExcel: exportarExcel,
     graphCall: graphCall, getSiteId: getSiteId, getListId: getListId,
     getCols: getCols, interno: interno,
     leerItems: leerItems, crearItem: crearItem, actualizarItem: actualizarItem, borrarItem: borrarItem,
