@@ -154,6 +154,9 @@
       <h2>Incrementos generales por categoría (sobre el forecast, se aplican a todos los hoteles)</h2>
       <div class="incs" id="incs"></div>
 
+      <h2>Reglas de consolidación <span style="font-weight:400;color:var(--muted);font-size:13px">(eliminaciones intragrupo · solo afectan a la columna Consolidado de Presupuestos 2027)</span></h2>
+      <div class="incs" id="reglasElim"></div>
+
       <h2>Impacto estimado sobre el grupo</h2>
       <div class="kpis" id="kpis"></div>
 
@@ -202,6 +205,7 @@ const HOTELES = D.hoteles || [];
 let modo = "inicio";        // inicio | nueva | activa
 let idActivo = null;        // id de la versión activa
 const gen = {}; CATS.forEach(c=> gen[c.clave]=0);
+let reglasInact = new Set();   // claves de reglas de consolidación desactivadas en la versión
 let overridesActivos = {};  // ajustes por hotel de la versión abierta (se conservan)
 const hotSel = {}; HOTELES.forEach(h=> hotSel[h.id]=true);   // hoteles incluidos en la versión
 let mesAud = null;   // mes de corte auditoría: null = automático por hotel; 0-12 = corte uniforme
@@ -255,6 +259,17 @@ function pintarIncs(){
   $("incs").querySelectorAll("input").forEach(inp=> inp.addEventListener("input", ()=>{
     gen[inp.dataset.cat]=num(inp.value); pintarKpis(); avisarPendiente(); }));
 }
+// Reglas de consolidación: un interruptor por regla (activa = se aplica la eliminación).
+function pintarReglas(){
+  const reglas = D.reglasElim || [];
+  if(!reglas.length){ $("reglasElim").innerHTML = `<div class="vmeta">No hay reglas definidas.</div>`; return; }
+  $("reglasElim").innerHTML = reglas.map(r=>{ const on = !reglasInact.has(r.clave);
+    return `<label class="inc gas" style="cursor:pointer"><span>${r.desc}${r.neto0?'':' <span style="color:var(--muted)">(deja externo)</span>'}</span>`
+      + `<input type="checkbox" data-regla="${r.clave}" ${on?"checked":""} style="width:auto;justify-self:end"></label>`; }).join("");
+  $("reglasElim").querySelectorAll("input").forEach(inp=> inp.addEventListener("change", ()=>{
+    if(inp.checked) reglasInact.delete(inp.dataset.regla); else reglasInact.add(inp.dataset.regla);
+    avisarPendiente(); }));
+}
 function impacto(){
   let ventas=0, gastos=0, ventasFc=0, gastosFc=0;
   const fcg=grupoForecast();
@@ -286,6 +301,7 @@ function cargarGeneral(reg){
   CATS.forEach(c=>{ gen[c.clave]=Math.round((reg.incrementos&&reg.incrementos[c.clave]||0)*1000)/10;
     const inp=$("g_"+c.clave); if(inp) inp.value=gen[c.clave]; });
   overridesActivos = reg.overrides || {};
+  reglasInact = new Set((reg.consolidacion && reg.consolidacion.inactivas) || []); pintarReglas();
   setHoteles(Array.isArray(reg.hoteles) ? reg.hoteles : null);   // null = todos
   setMesAud(typeof reg.mesAuditado==="number" ? reg.mesAuditado : null);
   pintarKpis();
@@ -293,7 +309,8 @@ function cargarGeneral(reg){
 function limpiarGeneral(){
   $("nombre").value=""; $("hipotesis").value="";
   CATS.forEach(c=>{ gen[c.clave]=0; const inp=$("g_"+c.clave); if(inp) inp.value=0; });
-  overridesActivos = {}; setHoteles(null); setMesAud(null); pintarKpis();
+  overridesActivos = {}; reglasInact = new Set(); pintarReglas();
+  setHoteles(null); setMesAud(null); pintarKpis();
 }
 function avisarPendiente(){ if(modo==="activa") $("guardadoAviso").textContent="Cambios sin guardar"; }
 
@@ -342,6 +359,7 @@ function registroDesdeFormulario(prev){
     hipotesis:$("hipotesis").value.trim(), incrementos,
     hoteles: HOTELES.filter(h=>hotSel[h.id]).map(h=>h.id),   // hoteles incluidos en el presupuesto
     mesAuditado: mesAud,   // mes de corte real→ppto (null = automático por hotel)
+    consolidacion: { inactivas: [...reglasInact] },   // reglas de consolidación desactivadas
     overrides: prev.overrides || overridesActivos || {},
     creada: prev.creada || new Date().toISOString(),
     modificada: new Date().toISOString(),
@@ -396,7 +414,7 @@ $("mesAud").addEventListener("change", ()=>{
   mesAud = $("mesAud").value==="" ? null : +$("mesAud").value; pintarKpis(); avisarPendiente(); });
 
 // Arranque: si hay versión activa guardada, reanudarla; si no, mostrar el inicio.
-pintarIncs(); pintarHoteles(); pintarMesAud(); pintarKpis(); pintarSelector(); pintarTabs();
+pintarIncs(); pintarReglas(); pintarHoteles(); pintarMesAud(); pintarKpis(); pintarSelector(); pintarTabs();
 const act = localStorage.getItem(LS_ACT);
 if(act && leerVersiones()[act]) activar(act); else mostrarInicio();
 })();
