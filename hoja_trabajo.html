@@ -124,7 +124,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=13"></script><script src="shg-cloud.js?v=13"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=14"></script><script src="shg-cloud.js?v=14"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("hoja_trabajo");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -146,10 +146,30 @@
     white-space:nowrap; color:var(--muted); }
   .ab-nube.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
   .ab-nube.err { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
+  .ab-cal { font-size:11.5px; border:1px solid var(--line); border-radius:999px; padding:5px 10px;
+    white-space:nowrap; color:var(--muted); cursor:help; }
+  .ab-cal.ok { color:var(--res); border-color:var(--res); background:var(--res-bg); }
+  .ab-cal.warn { color:var(--neg); border-color:var(--neg); background:rgba(192,57,43,.08); font-weight:700; }
+  .cal-modal { position:fixed; inset:0; z-index:60; background:rgba(15,20,27,.45);
+    display:flex; align-items:flex-start; justify-content:center; padding:48px 16px; }
+  .cal-modal[hidden] { display:none; }
+  .cal-box { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); width:min(760px,96vw); max-height:82vh; overflow:auto; padding:16px 18px; }
+  .cal-head { display:flex; justify-content:space-between; align-items:center; font-size:16px; margin-bottom:6px; }
+  .cal-close { border:1px solid var(--line); background:var(--panel); color:var(--muted); border-radius:8px;
+    cursor:pointer; font-size:13px; padding:4px 9px; }
+  .cal-close:hover { color:var(--neg); border-color:var(--neg); }
+  .cal-sub { color:var(--muted); font-size:12.5px; margin-bottom:10px; }
+  .cal-box h3 { font-size:13.5px; margin:14px 0 6px; }
+  .cal-box .cal-fix { font-weight:400; color:var(--muted); font-size:12px; }
+  .cal-scroll { overflow-x:auto; }
+  .cal-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .cal-tbl th, .cal-tbl td { text-align:left; padding:4px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .cal-tbl th.num, .cal-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; }
   /* Cabecera de cada ventana en Aptos Display negrita (con alternativas si no está instalada). */
   body h1 { font-family:"Aptos Display","Aptos","Segoe UI",system-ui,-apple-system,sans-serif; font-weight:700; letter-spacing:-.005em; }
 </style>
-<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="on" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="comparativo.html" class="" title="Comparativo">⚖️ Comparativo</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div>
+<div class="appbar"><a class="ab-home" href="index.html">🏠 Inicio</a><nav class="ab-nav"><a href="hoja_trabajo.html" class="on" title="Hoja de trabajo">📝 Hoja de trabajo</a><a href="alojamiento.html" class="" title="Alojamiento">🏨 Alojamiento</a><a href="personal.html" class="" title="Personal">👥 Personal</a><a href="resumen.html" class="" title="Resumen">📊 Resumen</a><a href="analisis.html" class="" title="Análisis">📈 Análisis</a><a href="por_partida.html" class="" title="Por Partida">🧾 Por Partida</a><a href="comparativo.html" class="" title="Comparativo">⚖️ Comparativo</a><a href="consolidado.html" class="" title="Consolidado">🏛️ Consolidado</a></nav><span class="ab-sp"></span><span class="ab-cal" id="abCal" hidden></span><span class="ab-nube" id="abNube">Nube: comprobando…</span><span class="ab-ver" id="abVer">Sin versión activa</span></div><div class="cal-modal" id="calModal" hidden><div class="cal-box"><div class="cal-head"><b>Datos sin mapear</b><button class="cal-close" id="calModalClose" title="Cerrar">✕</button></div><div id="calModalBody"></div></div></div>
 <script>
 (function(){
   try {
@@ -170,6 +190,54 @@
       a.href += (a.href.indexOf("?") < 0 ? "?" : "&") + "hotel=" + h;
     });
   } catch (e) {}
+  // Semáforo de calidad de dato: importe/filas descartados por mapeo (sin crosswalk o sin USALI).
+  (function(){
+    var el = document.getElementById("abCal"); if (!el) return;
+    var n0 = function (x){ return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); };
+    var esc = function (s){ return String(s).replace(/[<>&]/g, function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c]; }); };
+    var abrir = function (c){
+      var m = document.getElementById("calModal"); if (!m) return;
+      var tabla = function (titulo, filas, cols, fix){
+        if (!filas.length) return "";
+        var head = cols.map(function(x){ return '<th class="' + (x.num ? 'num' : '') + '">' + x.t + '</th>'; }).join("");
+        var body = filas.map(function(f){ return '<tr>' + cols.map(function(x){
+          return '<td class="' + (x.num ? 'num' : '') + '">' + (x.num ? n0(f[x.k]) + (x.eur ? ' \u20ac' : '') : esc(f[x.k])) + '</td>'; }).join("") + '</tr>'; }).join("");
+        return '<h3>' + titulo + ' <span class="cal-fix">' + fix + '</span></h3>'
+          + '<div class="cal-scroll"><table class="cal-tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+      };
+      var html = '<div class="cal-sub">Estos apuntes NO entran en los informes porque no se pueden mapear. '
+        + 'Total: <b>' + c.filasSinMapear + ' filas · ' + n0(c.importeSinMapear) + ' \u20ac</b>'
+        + (c.generado ? ' · datos de ' + esc(c.generado) : '') + '.</div>'
+        + tabla("Sucursales sin crosswalk (" + (c.sucursales||[]).length + ")", c.sucursales || [],
+            [{t:"Sucursal", k:"sucursal"}, {t:"Filas", k:"filas", num:true}, {t:"Importe", k:"importe", num:true, eur:true}],
+            "añádelas a Crosswalk_Sociedades.xlsx")
+        + tabla("Cuentas sin mapeo USALI (" + (c.cuentas||[]).length + ")", (c.cuentas||[]).map(function(x){ return {cuenta:x.cuenta + " (plan " + x.plan + ")", filas:x.filas, importe:x.importe}; }),
+            [{t:"Cuenta", k:"cuenta"}, {t:"Filas", k:"filas", num:true}, {t:"Importe", k:"importe", num:true, eur:true}],
+            "añádelas a Plan cuentas - Usali.xlsx");
+      document.getElementById("calModalBody").innerHTML = html || '<div class="cal-sub">Sin detalle.</div>';
+      m.hidden = false;
+    };
+    var pinta = function (c) {
+      if (!c || typeof c.filasSinMapear !== "number") return;
+      el.hidden = false;
+      if (c.filasSinMapear > 0) {
+        el.className = "ab-cal warn"; el.style.cursor = "pointer";
+        el.textContent = "\u26a0 Datos: " + c.filasSinMapear + " sin mapear \u00b7 " + n0(c.importeSinMapear) + " \u20ac";
+        el.title = "Clic para ver qué cuentas/sucursales no se han mapeado y dónde arreglarlo";
+        el.onclick = function(){ abrir(c); };
+      } else {
+        el.className = "ab-cal ok";
+        el.textContent = "Datos \u2713";
+        el.title = "Todos los apuntes del libro se han mapeado correctamente" + (c.generado ? " (generado " + c.generado + ")" : "");
+      }
+    };
+    try {
+      if (window.SHG && SHG.datos) { SHG.datos("calidad").then(pinta).catch(function(){}); }
+      else { fetch("datos/calidad.json").then(function (r){ return r.ok ? r.json() : null; }).then(pinta).catch(function(){}); }
+    } catch (e) {}
+    var m = document.getElementById("calModal");
+    if (m) { m.addEventListener("click", function(e){ if (e.target === m || e.target.id === "calModalClose") m.hidden = true; }); }
+  })();
 })();
 </script>
 

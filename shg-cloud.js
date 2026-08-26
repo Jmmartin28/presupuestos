@@ -170,9 +170,10 @@
       var hlist = null; try { var hj = JSON.parse(f.HotelesJSON || "null"); if (Array.isArray(hj)) hlist = hj; } catch (e) {}
       var mAud = (f.MesAuditado === "" || f.MesAuditado == null || isNaN(Number(f.MesAuditado))) ? null : Number(f.MesAuditado);
       var cMf = null; try { var cj = JSON.parse(f.CentralMfJSON || "null"); if (Array.isArray(cj) && cj.length === 12) cMf = cj; } catch (e) {}
+      var cons = null; try { var pj = JSON.parse(f.ConsolidacionJSON || "null"); if (pj && typeof pj === "object") cons = pj; } catch (e) {}
       out[id] = { anio: +(f[fAnio] || 0), nombre: f.Nombre || "", autor: f.Autor || "",
         hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON), hoteles: hlist, mesAuditado: mAud, centralMf: cMf,
-        overrides: {}, medidas: {}, alojamiento: {}, personal: {}, pptoCat: {},
+        consolidacion: cons, overrides: {}, medidas: {}, alojamiento: {}, personal: {}, pptoCat: {},
         creada: f.Creada || "", modificada: f.Modificada || "" };
     });
     hots.forEach(function (it) {
@@ -223,6 +224,7 @@
       if ("HotelesJSON" in cols) fields.HotelesJSON = JSON.stringify(reg.hoteles || []);   // solo si existe la columna
       if ("MesAuditado" in cols) fields.MesAuditado = (reg.mesAuditado == null ? "" : String(reg.mesAuditado));   // "" = automático
       if ("CentralMfJSON" in cols) fields.CentralMfJSON = JSON.stringify(reg.centralMf || null);   // override MF Central
+      if ("ConsolidacionJSON" in cols) fields.ConsolidacionJSON = JSON.stringify(reg.consolidacion || null);   // reglas de consolidación activas/inactivas
       var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
       if (id) await actualizarItem(C.listaVersiones, id, fields);
       else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
