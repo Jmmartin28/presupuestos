@@ -79,7 +79,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=12"></script><script src="shg-cloud.js?v=12"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("alojamiento");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=13"></script><script src="shg-cloud.js?v=13"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("alojamiento");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -137,8 +137,10 @@
     <div class="controls">
       <div class="ctl"><label>Hotel</label><select id="selHotel"></select></div>
       <div class="ctl"><label>Incremento ingresos % (ADR)</label><input type="number" id="incIng" value="0" step="0.5"></div>
+      <div class="ctl"><label>Incremento ocupación %</label><input type="number" id="incOcu" value="0" step="0.5"></div>
       <button class="btn" id="comprimir">Comprimir meses</button>
       <button class="btn" id="limpiar">Limpiar Datos</button>
+      <button class="btn" id="btnExcel" title="Exporta un Excel con una pestaña por hotel y una de agregado">Exportar a Excel</button>
       <span id="savedHint" style="font-size:11.5px;color:var(--inp);align-self:center;transition:opacity .4s;"></span>
     </div>
     <div id="centralMfSec" style="display:none; margin-bottom:14px">
@@ -205,7 +207,8 @@ function guardarAloj(){ const a=_activeVer(), h=$("savedHint");
   clearTimeout(_saveT); _saveT=setTimeout(()=>{ try{
     const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[a]) return;
     vs[a].alojamiento=vs[a].alojamiento||{};
-    vs[a].alojamiento[D.idHotel]={ dias:S.dias, ocu:S.ocu, adr:S.adr, incIng:parseFloat($("incIng").value)||0,
+    vs[a].alojamiento[D.idHotel]={ dias:S.dias, ocu:S.ocu, adr:S.adr,
+      incIng:parseFloat($("incIng").value)||0, incOcu:parseFloat($("incOcu").value)||0,
       ventasMes: S.ocu.map((o,i)=> o*S.adr[i]) };   // ingresos publicados para la hoja de trabajo
     vs[a].modificada=new Date().toISOString();
     localStorage.setItem("shg_versiones", JSON.stringify(vs));
@@ -219,6 +222,7 @@ function guardarAloj(){ const a=_activeVer(), h=$("savedHint");
   if(Array.isArray(s.ocu)) S.ocu=s.ocu.slice();
   if(Array.isArray(s.adr)) S.adr=s.adr.slice();
   if(s.incIng!=null){ const e=$("incIng"); if(e) e.value=s.incIng; }
+  if(s.incOcu!=null){ const e=$("incOcu"); if(e) e.value=s.incOcu; }
 }catch(e){} })();
 const disp = () => S.dias.map(d => d * D.hab);
 const pct = () => S.ocu.map((o,i)=> { const d=S.dias[i]*D.hab; return d? o/d*100:0; });
@@ -226,8 +230,8 @@ const ventas = () => S.ocu.map((o,i)=> o * S.adr[i]);
 const wadr = (v,o)=> sum(o)? sum(v)/sum(o):0;
 const wpct = (o,d)=> sum(d)? sum(o)/sum(d)*100:0;
 
-$("cab").innerHTML = '<th class="lbl">Concepto</th>' + M.map(m=>`<th class="num mes">${m}</th>`).join("")
-  + '<th class="num tot">Año</th>';
+$("cab").innerHTML = '<th class="lbl">Concepto</th>' + M.map(m=>`<th class="num mes">${m}<span class="delta"></span></th>`).join("")
+  + '<th class="num tot">Año<span class="delta"></span></th>';
 
 function ref(label,arr,fmt,tot){ return `<tr class="ref"><td class="lbl">${label}</td>`
   + arr.map(v=>`<td class="num mes">${fmt(v)}<span class="delta"></span></td>`).join("")
@@ -320,6 +324,12 @@ $("incIng").addEventListener("input", e => {         // incremento de ingresos �
   S.adr.forEach((a,i)=> setInput("adr", i, n1(a)));
   recompute(); guardarAloj();
 });
+$("incOcu").addEventListener("input", e => {         // incremento de ocupación → nº de noches
+  const inc = 1 + (parseFloat(e.target.value) || 0) / 100;
+  S.ocu = D.ocu26.map(o => o * inc);
+  S.ocu.forEach((o,i)=>{ setInput("ocu", i, o ? n0(o) : ""); setInput("pct", i, o ? n1(pctM(i)) : ""); });
+  recompute(); guardarAloj();
+});
 $("comprimir").addEventListener("click", () => {     // comprime/expande los meses
   const solo = document.getElementById("t").classList.toggle("solo-anual");
   $("comprimir").textContent = solo ? "Ver meses" : "Comprimir meses";
@@ -350,6 +360,68 @@ document.querySelector("h1").textContent = "Alojamiento · " + D.nombre;
 (function(){ const s=document.querySelector(".sub"); if(s) s.textContent = D.sub; })();
 
 recompute();
+
+// ---- Exportación a Excel: una pestaña por hotel + una de agregado ----
+// Series de un hotel (Real 25, Forecast 26 con corte, Ppto 27 con las ediciones de la versión).
+function _seriesHotel(id){
+  const H=D.porHotel[id]; if(!H) return null; const N=mesCorte();
+  const v26 = (N!==null && H.vReal26 && H.vPpto26) ? M.map((_,m)=>Math.round(m<N?H.vReal26[m]:H.vPpto26[m])) : (H.v26||[]).slice();
+  const ocu26 = (N!==null && H.ocuReal26 && H.ocuPpto26) ? M.map((_,m)=>Math.round(m<N?H.ocuReal26[m]:H.ocuPpto26[m])) : (H.ocu26||[]).slice();
+  const disp26 = (N!==null && H.dispReal26 && H.dispPpto26) ? M.map((_,m)=>Math.round(m<N?H.dispReal26[m]:H.dispPpto26[m])) : (H.disp26||[]).slice();
+  const pct26 = M.map((_,m)=> disp26[m]? Math.round(ocu26[m]/disp26[m]*1000)/10:0);
+  const adr26 = M.map((_,m)=> ocu26[m]? Math.round(v26[m]/ocu26[m]*100)/100:0);
+  let dias=(H.diasDef||[]).slice(), ocu=ocu26.slice(), adr=adr26.slice();
+  const a=_activeVer();
+  if(a){ const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); const s=vs[a]&&vs[a].alojamiento&&vs[a].alojamiento[id];
+    if(s){ if(Array.isArray(s.dias))dias=s.dias.slice(); if(Array.isArray(s.ocu))ocu=s.ocu.slice(); if(Array.isArray(s.adr))adr=s.adr.slice(); } }
+  const disp27=dias.map(d=> d*H.hab), pct27=ocu.map((o,i)=> disp27[i]? o/disp27[i]*100:0), v27=ocu.map((o,i)=> o*adr[i]);
+  return { v25:H.v25, v26, v27, ocu25:H.ocu25, ocu26, ocu27:ocu, disp25:H.disp25, disp26, disp27,
+    pct25:H.pct25, pct26, pct27, adr25:H.adr25, adr26, adr27:adr, dias27:dias };
+}
+function _aggSeries(hs){
+  const S=hs.map(h=>_seriesHotel(h.id)).filter(Boolean), Z=()=>M.map(()=>0);
+  const suma=k=> S.reduce((a,x)=> a.map((v,i)=>v+(x[k][i]||0)), Z());
+  const v25=suma('v25'),v26=suma('v26'),v27=suma('v27'),ocu25=suma('ocu25'),ocu26=suma('ocu26'),ocu27=suma('ocu27'),
+    disp25=suma('disp25'),disp26=suma('disp26'),disp27=suma('disp27');
+  const pc=(o,d)=>M.map((_,i)=> d[i]? o[i]/d[i]*100:0), ad=(v,o)=>M.map((_,i)=> o[i]? v[i]/o[i]:0);
+  return { v25,v26,v27, ocu25,ocu26,ocu27, disp25,disp26,disp27, pct25:pc(ocu25,disp25),pct26:pc(ocu26,disp26),pct27:pc(ocu27,disp27),
+    adr25:ad(v25,ocu25),adr26:ad(v26,ocu26),adr27:ad(v27,ocu27), dias27:Z() };
+}
+function _tablaHotel(s){
+  const wp=(o,d)=>sum(d)?sum(o)/sum(d)*100:0, wa=(v,o)=>sum(o)?sum(v)/sum(o):0;
+  const fila=(cls,label,arr,fmt,tot,refArr,totRef,dfn)=> `<tr class="${cls}"><td class="lbl">${label}</td>`
+    + arr.map((v,i)=>`<td class="num mes">${fmt(v)}${refArr?dfn(v-(refArr[i]||0),refArr[i]||0):'<span class="delta"></span>'}</td>`).join("")
+    + `<td class="num tot">${fmt(tot)}${refArr?dfn(tot-totRef,totRef):'<span class="delta"></span>'}</td></tr>`;
+  let b = `<tr class="sec"><td colspan="99">Ventas de alojamiento (€)</td></tr>`
+    + fila('ref','Real 2025', s.v25, n0, sum(s.v25))
+    + fila('ref','Forecast 2026', s.v26, n0, sum(s.v26), s.v25, sum(s.v25), dImpPct)
+    + fila('calc ventas','Ppto 2027', s.v27, n0, sum(s.v27), s.v26, sum(s.v26), dImpPct)
+    + `<tr class="sec"><td colspan="99">Ocupación y ADR</td></tr>`
+    + fila('inp inp-dias','Días 2027', s.dias27, n0, sum(s.dias27))
+    + fila('calc','Disponibilidad 2027', s.disp27, n0, sum(s.disp27))
+    + fila('ref','Ocupación nº 2025', s.ocu25, n0, sum(s.ocu25))
+    + fila('ref','Ocupación nº 2026', s.ocu26, n0, sum(s.ocu26), s.ocu25, sum(s.ocu25), dFmt(n0))
+    + fila('inp inp-ocu','Ocupación nº 2027', s.ocu27, n0, sum(s.ocu27), s.ocu26, sum(s.ocu26), dFmt(n0))
+    + fila('ref','Ocupación % 2025', s.pct25, pctS, wp(s.ocu25,s.disp25))
+    + fila('ref','Ocupación % 2026', s.pct26, pctS, wp(s.ocu26,s.disp26), s.pct25, wp(s.ocu25,s.disp25), dFmt(x=>n1(x)+' pp'))
+    + fila('inp inp-pct','Ocupación % 2027', s.pct27, n1, wp(s.ocu27,s.disp27), s.pct26, wp(s.ocu26,s.disp26), dFmt(x=>n1(x)+' pp'))
+    + fila('ref','ADR 2025', s.adr25, eur, wa(s.v25,s.ocu25))
+    + fila('ref','ADR 2026', s.adr26, eur, wa(s.v26,s.ocu26), s.adr25, wa(s.v25,s.ocu25), dFmt(eur))
+    + fila('inp inp-adr','ADR 2027', s.adr27, n1, wa(s.v27,s.ocu27), s.adr26, wa(s.v26,s.ocu26), dFmt(eur));
+  const cab = '<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}<span class="delta"></span></th>`).join("")+'<th class="num tot">Año<span class="delta"></span></th>';
+  const t=document.createElement("table"); t.innerHTML = `<thead><tr>${cab}</tr></thead><tbody>${b}</tbody>`; return t;
+}
+$("btnExcel").addEventListener("click", ()=>{
+  if(!(window.SHG && SHG.nuevoLibro)){ return; }
+  const hs=D.hoteles.filter(hotelVisible); if(!hs.length) return;
+  const lib=SHG.nuevoLibro();
+  const cont=document.createElement("div"); cont.style.cssText="position:absolute;left:-9999px;top:0;"; document.body.appendChild(cont);
+  const push=(nombre,s)=>{ cont.innerHTML=""; const t=_tablaHotel(s); cont.appendChild(t); SHG.agregarHoja(lib, nombre, t); };
+  push("Agregado", _aggSeries(hs));
+  hs.forEach(h=>{ const s=_seriesHotel(h.id); if(s) push(h.nombre, s); });
+  document.body.removeChild(cont);
+  SHG.descargarLibro(lib, "Alojamiento");
+});
 
 // Override manual del ingreso MF de la Central (intragrupo). Solo si la entidad es la Central.
 (function(){

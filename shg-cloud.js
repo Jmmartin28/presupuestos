@@ -488,11 +488,12 @@
     var end = new Uint8Array([].concat([0x50, 0x4b, 0x05, 0x06], u16(0), u16(0), u16(files.length), u16(files.length), u32(cd.length), u32(off), u16(0)));
     return new Blob([_cat(local), cd, end], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   }
-  // Color computado (rgb/rgba) -> ARGB "FFRRGGBB"; null si es transparente.
+  // Color computado (rgb/rgba) -> ARGB "FFRRGGBB"; null si es transparente. Los tintes con
+  // opacidad (rgba con alpha<1) se mezclan sobre blanco, para que salgan claros como en la app.
   function _argb(c) {
     var m = String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/); if (!m) return null;
-    if (m[4] !== undefined && parseFloat(m[4]) === 0) return null;
-    var h = function (n) { n = (+n).toString(16); return n.length < 2 ? "0" + n : n; };
+    var a = m[4] === undefined ? 1 : parseFloat(m[4]); if (a === 0) return null;
+    var h = function (n) { n = Math.round(a * (+n) + (1 - a) * 255); return (n < 16 ? "0" : "") + n.toString(16); };
     return ("FF" + h(m[1]) + h(m[2]) + h(m[3])).toUpperCase();
   }
   // Texto de celda -> número + formato (con sufijo € / % / pp) o texto.
@@ -506,43 +507,49 @@
     if (suf === "%") fmt += "&quot;%&quot;"; else if (suf === "€") fmt += "&quot; €&quot;"; else if (suf === "pp") fmt += "&quot; pp&quot;";
     return { num: n, fmt: fmt };
   }
-  function exportarExcel(tabla, nombre, opts) {
-    var el = typeof tabla === "string" ? document.getElementById(tabla) : tabla;
-    if (!el) return;
-    // Estilos dinámicos: replican los colores reales del informe (relleno, texto, negrita).
-    var fonts = ['<font><sz val="10"/><name val="Calibri"/></font>'], fontKey = { "|0": 0 };
-    var fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'], fillKey = {};
-    var numFmts = [], numKey = {}, nextNum = 164;
-    var xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'], xfKey = {};
-    function fontId(color, bold) {
-      var k = (color || "") + "|" + (bold ? 1 : 0); if (fontKey[k] != null) return fontKey[k];
-      fonts.push("<font>" + (bold ? "<b/>" : "") + '<sz val="10"/>' + (color ? '<color rgb="' + color + '"/>' : "") + '<name val="Calibri"/></font>');
-      return fontKey[k] = fonts.length - 1;
-    }
-    function fillId(bg) {
-      if (!bg) return 0; if (fillKey[bg] != null) return fillKey[bg];
-      fills.push('<fill><patternFill patternType="solid"><fgColor rgb="' + bg + '"/></patternFill></fill>');
-      return fillKey[bg] = fills.length - 1;
-    }
-    function numId(fmt) {
-      if (!fmt) return 0; if (numKey[fmt] != null) return numKey[fmt];
-      var id = nextNum++; numFmts.push('<numFmt numFmtId="' + id + '" formatCode="' + fmt + '"/>'); return numKey[fmt] = id;
-    }
-    function xfId(fi, fl, nm, align) {
-      var k = fi + "|" + fl + "|" + nm + "|" + align; if (xfKey[k] != null) return xfKey[k];
-      xfs.push('<xf numFmtId="' + nm + '" fontId="' + fi + '" fillId="' + fl + '" borderId="0" applyBorder="1"' +
-        (nm ? ' applyNumberFormat="1"' : "") + (fi ? ' applyFont="1"' : "") + (fl ? ' applyFill="1"' : "") +
-        '><alignment horizontal="' + align + '"/></xf>');
-      return xfKey[k] = xfs.length - 1;
-    }
-    var filas = [].slice.call(el.querySelectorAll("tr")), xml = "", nf = 0, merges = [], mesCols = {}, maxCol = 0;
+  // Estado de estilos de un libro (compartido por todas sus hojas).
+  function _nuevoLibro() {
+    var L = {
+      fonts: ['<font><sz val="10"/><name val="Calibri"/></font>'], fontKey: { "|0": 0 },
+      fills: ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'], fillKey: {},
+      numFmts: [], numKey: {}, nextNum: 164,
+      xfs: ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'], xfKey: {},
+      hojas: [], usadas: {}
+    };
+    L.fontId = function (color, bold) { var k = (color || "") + "|" + (bold ? 1 : 0); if (L.fontKey[k] != null) return L.fontKey[k];
+      L.fonts.push("<font>" + (bold ? "<b/>" : "") + '<sz val="10"/>' + (color ? '<color rgb="' + color + '"/>' : "") + '<name val="Calibri"/></font>'); return L.fontKey[k] = L.fonts.length - 1; };
+    L.fillId = function (bg) { if (!bg) return 0; if (L.fillKey[bg] != null) return L.fillKey[bg];
+      L.fills.push('<fill><patternFill patternType="solid"><fgColor rgb="' + bg + '"/></patternFill></fill>'); return L.fillKey[bg] = L.fills.length - 1; };
+    L.numId = function (fmt) { if (!fmt) return 0; if (L.numKey[fmt] != null) return L.numKey[fmt];
+      var id = L.nextNum++; L.numFmts.push('<numFmt numFmtId="' + id + '" formatCode="' + fmt + '"/>'); return L.numKey[fmt] = id; };
+    L.xfId = function (fi, fl, nm, align) { var k = fi + "|" + fl + "|" + nm + "|" + align; if (L.xfKey[k] != null) return L.xfKey[k];
+      L.xfs.push('<xf numFmtId="' + nm + '" fontId="' + fi + '" fillId="' + fl + '" borderId="0" applyBorder="1"' + (nm ? ' applyNumberFormat="1"' : "") + (fi ? ' applyFont="1"' : "") + (fl ? ' applyFill="1"' : "") + '><alignment horizontal="' + align + '"/></xf>'); return L.xfKey[k] = L.xfs.length - 1; };
+    return L;
+  }
+  function _stylesXml(L) {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      (L.numFmts.length ? '<numFmts count="' + L.numFmts.length + '">' + L.numFmts.join("") + "</numFmts>" : "") +
+      '<fonts count="' + L.fonts.length + '">' + L.fonts.join("") + "</fonts>" +
+      '<fills count="' + L.fills.length + '">' + L.fills.join("") + "</fills>" +
+      '<borders count="1"><border><left/><right/><top/><bottom style="thin"><color rgb="FFDDDDDD"/></bottom><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="' + L.xfs.length + '">' + L.xfs.join("") + "</cellXfs>" +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  }
+  // Construye el XML de UNA hoja leyendo el estilo real de cada celda (usa el estado de estilos L).
+  function _hojaXml(L, el, opts) {
+    var fontId = L.fontId, fillId = L.fillId, numId = L.numId, xfId = L.xfId;
+    var filas = [].slice.call(el.querySelectorAll("tr")), xml = "", nf = 0, merges = [], mesCols = {}, maxCol = 0, pend = {};
     filas.forEach(function (tr) {
       var celdas = [].slice.call(tr.children).filter(function (c) { return c.tagName === "TD" || c.tagName === "TH"; });
       if (!celdas.length) return;
       var esCab = tr.parentNode && tr.parentNode.tagName === "THEAD";
       nf += 1; var ci = 0; xml += '<row r="' + nf + '">';
       celdas.forEach(function (cel) {
+        while (pend[ci] > 0) ci++;                        // saltar columnas ocupadas por un rowspan
         var span = parseInt(cel.getAttribute("colspan") || "1", 10) || 1;
+        var rspan = parseInt(cel.getAttribute("rowspan") || "1", 10) || 1;
         var ref = _colName(ci) + nf, cs = getComputedStyle(cel);
         var bg = _argb(cs.backgroundColor), col = _argb(cs.color);
         var bold = (+cs.fontWeight) >= 600 || cs.fontWeight === "bold";
@@ -555,71 +562,82 @@
         var s = xfId(fontId(col, bold || esCab), fillId(bg), (p.num != null ? numId(p.fmt) : 0), align);
         if (p.num != null) xml += '<c r="' + ref + '" s="' + s + '"><v>' + p.num + "</v></c>";
         else xml += '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t>' + _xmlesc(txt) + "</t></is></c>";
-        if (span > 1) merges.push(ref + ":" + _colName(ci + span - 1) + nf);   // cabecera combinada
+        if (span > 1 || rspan > 1) merges.push(ref + ":" + _colName(ci + span - 1) + (nf + rspan - 1));   // combinadas
+        if (rspan > 1) for (var j = 0; j < span; j++) pend[ci + j] = rspan;
         if (cel.classList.contains("mes")) for (var k = 0; k < span; k++) mesCols[ci + k] = 1;
         ci += span;
       });
       if (ci > maxCol) maxCol = ci;
+      Object.keys(pend).forEach(function (c) { if (pend[c] > 0) pend[c]--; });   // fila consumida
       xml += "</row>";
     });
-    // Agrupación de columnas de meses (outline nivel 1, ocultas) para poder desplegar en Excel.
-    var colsXml = "", outlineCol = 0;
-    if (opts && opts.group) {
-      var ini = null;
-      for (var g = 0; g <= maxCol; g++) {
-        if (mesCols[g]) { if (ini === null) ini = g; }
-        else if (ini !== null) { colsXml += '<col min="' + (ini + 1) + '" max="' + g + '" width="9" outlineLevel="1" hidden="1"/>'; ini = null; }
-      }
-      if (ini !== null) colsXml += '<col min="' + (ini + 1) + '" max="' + maxCol + '" width="9" outlineLevel="1" hidden="1"/>';
-      if (colsXml) outlineCol = 1;
+    // Anchos de columna (concepto ancho; datos algo más anchos; meses agrupados si opts.group).
+    var colsArr = ['<col min="1" max="1" width="26"/>'], outlineCol = 0;
+    var run = null;
+    var flush = function (end) { if (run === null) return; var grp = !!(opts && opts.group && run.mes);
+      colsArr.push('<col min="' + (run.ini + 1) + '" max="' + (end + 1) + '" width="' + (grp ? 10.5 : 12) + '"' + (grp ? ' outlineLevel="1" hidden="1"' : "") + "/>");
+      if (grp) outlineCol = 1; run = null; };
+    for (var g = 1; g < maxCol; g++) {
+      var isMes = !!mesCols[g];
+      if (run === null) run = { mes: isMes, ini: g };
+      else if (run.mes !== isMes) { flush(g - 1); run = { mes: isMes, ini: g }; }
     }
-    var _STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      (numFmts.length ? '<numFmts count="' + numFmts.length + '">' + numFmts.join("") + "</numFmts>" : "") +
-      '<fonts count="' + fonts.length + '">' + fonts.join("") + "</fonts>" +
-      '<fills count="' + fills.length + '">' + fills.join("") + "</fills>" +
-      '<borders count="1"><border><left/><right/><top/><bottom style="thin"><color rgb="FFDDDDDD"/></bottom><diagonal/></border></borders>' +
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-      '<cellXfs count="' + xfs.length + '">' + xfs.join("") + "</cellXfs>" +
-      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    flush(maxCol - 1);
+    var colsXml = colsArr.join("");
     var mergesXml = merges.length ? '<mergeCells count="' + merges.length + '">' +
       merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join("") + '</mergeCells>' : "";
-    var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    var fz = opts && opts.freeze;   // {x, y}: inmoviliza x columnas y y filas (paneles)
+    var sheetViews = fz ? '<sheetViews><sheetView workbookViewId="0">' +
+      '<pane xSplit="' + fz.x + '" ySplit="' + fz.y + '" topLeftCell="' + _colName(fz.x) + (fz.y + 1) + '" activePane="bottomRight" state="frozen"/>' +
+      '</sheetView></sheetViews>' : "";
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       (outlineCol ? '<sheetPr><outlinePr summaryRight="1"/></sheetPr>' : "") +
+      sheetViews +
       (outlineCol ? '<sheetFormatPr defaultRowHeight="15" outlineLevelCol="1"/>' : "") +
       (colsXml ? "<cols>" + colsXml + "</cols>" : "") +
       "<sheetData>" + xml + "</sheetData>" + mergesXml + "</worksheet>";
-    var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
-      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>';
-    var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
-    var wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-      '<sheets><sheet name="Datos" sheetId="1" r:id="rId1"/></sheets></workbook>';
-    var wbrels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
-      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+  }
+  // Añade una hoja al libro AHORA (lee los estilos vivos de la tabla en este momento).
+  // Se llama repetidamente renderizando cada hotel antes de cada llamada.
+  function agregarHoja(L, nombre, el, opts) {
+    el = typeof el === "string" ? document.getElementById(el) : el; if (!el) return;
+    var nm = String(nombre || "Hoja").replace(/[:\\\/?*\[\]]/g, " ").trim().slice(0, 31) || "Hoja";
+    while (L.usadas[nm.toLowerCase()]) nm = nm.slice(0, 27) + " (" + (L.hojas.length + 1) + ")";
+    L.usadas[nm.toLowerCase()] = 1;
+    L.hojas.push({ nombre: nm, xml: _hojaXml(L, el, opts) });
+  }
+  // Ensambla y descarga el libro con las hojas ya añadidas.
+  function descargarLibro(L, nombre) {
     var enc = function (s) { return _ENC.encode(s); };
-    var blob = _zip([
-      { name: "[Content_Types].xml", data: enc(ct) },
-      { name: "_rels/.rels", data: enc(rels) },
-      { name: "xl/workbook.xml", data: enc(wb) },
-      { name: "xl/_rels/workbook.xml.rels", data: enc(wbrels) },
-      { name: "xl/styles.xml", data: enc(_STYLES) },
-      { name: "xl/worksheets/sheet1.xml", data: enc(sheet) }
-    ]);
-    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    var partes = [
+      { name: "_rels/.rels", data: enc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>') },
+      { name: "xl/styles.xml", data: enc(_stylesXml(L)) }
+    ];
+    var ctOv = "", wbSheets = "", wbRel = "";
+    L.hojas.forEach(function (s, i) {
+      var n = i + 1;
+      partes.push({ name: "xl/worksheets/sheet" + n + ".xml", data: enc(s.xml) });
+      ctOv += '<Override PartName="/xl/worksheets/sheet' + n + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+      wbSheets += '<sheet name="' + _xmlesc(s.nombre) + '" sheetId="' + n + '" r:id="rId' + n + '"/>';
+      wbRel += '<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + n + '.xml"/>';
+    });
+    partes.push({ name: "[Content_Types].xml", data: enc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + ctOv + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>') });
+    partes.push({ name: "xl/workbook.xml", data: enc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + wbSheets + '</sheets></workbook>') });
+    partes.push({ name: "xl/_rels/workbook.xml.rels", data: enc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + wbRel + '<Relationship Id="rId' + (L.hojas.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>') });
+    var url = URL.createObjectURL(_zip(partes)), a = document.createElement("a");
     a.href = url;
     a.download = (nombre || "informe") + "_" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + ".xlsx";
     document.body.appendChild(a); a.click();
     setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
   }
+  function exportarExcel(tabla, nombre, opts) {
+    var L = _nuevoLibro(); agregarHoja(L, (opts && opts.hoja) || "Datos", tabla, opts); descargarLibro(L, nombre);
+  }
 
   window.SHG = {
-    init: init, login: login, logout: logout, cuenta: cuenta, exportarExcel: exportarExcel,
+    init: init, login: login, logout: logout, cuenta: cuenta,
+    exportarExcel: exportarExcel, nuevoLibro: _nuevoLibro, agregarHoja: agregarHoja, descargarLibro: descargarLibro,
     graphCall: graphCall, getSiteId: getSiteId, getListId: getListId,
     getCols: getCols, interno: interno,
     leerItems: leerItems, crearItem: crearItem, actualizarItem: actualizarItem, borrarItem: borrarItem,

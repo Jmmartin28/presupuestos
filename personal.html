@@ -72,7 +72,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=12"></script><script src="shg-cloud.js?v=12"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=13"></script><script src="shg-cloud.js?v=13"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("personal");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -131,6 +131,7 @@
       <div class="ctl"><label>% Eventos</label><input type="number" id="pEve" step="0.5"></div>
       <button class="btn" id="compR">Comprimir meses</button>
       <button class="btn on" id="btnDif" title="Muestra u oculta las diferencias y % (Forecast)">Ocultar diferencias</button>
+      <button class="btn" id="btnExcel" title="Exporta un Excel con una pestaña por hotel y una de agregado">Exportar a Excel</button>
       <span id="savedHint" style="font-size:11.5px;color:var(--res);align-self:center;transition:opacity .4s;"></span>
       <div class="ctl" style="margin-left:auto"><label>Referencia de FTE</label><select id="refBase"><option value="fc">Forecast 2026</option><option value="prev">Año anterior</option></select></div>
     </div>
@@ -265,7 +266,7 @@ function meses(pfx, editable, cls){ return M.map((_,i)=> editable
 function filaR(cls,id,label,editable){ return `<tr class="${cls}"><td class="lbl">${label}</td>`
   + meses(id, editable) + `<td class="num tot" id="${id}-t"></td></tr>`; }
 
-$("cabR").innerHTML='<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}</th>`).join("")+'<th class="num tot">Año</th>';
+$("cabR").innerHTML='<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}<span class="delta"></span></th>`).join("")+'<th class="num tot">Año<span class="delta"></span></th>';
 $("cuerpoR").innerHTML =
     filaR("plant","plant","Plantilla permanente",false)
   + filaR("","abs","Absentismo",true) + filaR("","vac","Vacaciones",true) + filaR("","eve","Eventos",true)
@@ -361,6 +362,72 @@ document.querySelector("h1").textContent = "Personal · " + D.porHotel[D.idHotel
 cargarPers();
 writePuestos();
 recompute();
+
+// ---- Exportación a Excel: una pestaña por hotel + una de agregado ----
+// Escenarios (cur = ppto con ediciones de la versión; ref = forecast; prev = año anterior) de un hotel.
+function _seriesPersonal(id){
+  const P0=(D.porHotel[id]||{}).personal; if(!P0) return null;
+  let puestos=(P0.puestos||[]).map(p=>({ fte:(p.fteFc||[]).slice(), sueldo:p.sueldoFc||0, fteFc:(p.fteFc||[]).slice(), sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
+  let pAbs=P0.pct.absentismo, pVac=P0.pct.vacaciones, pEve=P0.pct.eventos;
+  let man={abs:Z().map(()=>null),vac:Z().map(()=>null),eve:Z().map(()=>null)};
+  let unifCur=(P0.unifFc||[]).slice(), unifFc=(P0.unifFc||[]).slice(), unifPrev=(P0.unifPrev||[]).slice();
+  const a=_activeVer();
+  if(a){ const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); const s=vs[a]&&vs[a].personal&&vs[a].personal[id];
+    if(s){
+      if(Array.isArray(s.puestos)) puestos=s.puestos.map(p=>({ fte:(p.fte||p.fteFc||[]).slice(), sueldo:(p.sueldo!=null?p.sueldo:p.sueldoFc)||0, fteFc:(p.fteFc||[]).slice(), sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
+      if(s.pAbs!=null) pAbs=(parseFloat(s.pAbs)||0)/100; if(s.pVac!=null) pVac=(parseFloat(s.pVac)||0)/100; if(s.pEve!=null) pEve=(parseFloat(s.pEve)||0)/100;
+      if(s.manual){ ["abs","vac","eve"].forEach(k=>{ if(Array.isArray(s.manual[k])) s.manual[k].forEach((v,i)=> man[k][i]=v); }); }
+      if(Array.isArray(s.unif)) unifCur=s.unif.slice();
+    }
+  }
+  function esc(fteKey,sueldoKey,pA,pV,pE,usarMan,unif){
+    const plant=M.map((_,i)=> puestos.reduce((acc,p)=> acc+(p[fteKey][i]||0)*(p[sueldoKey]||0),0));
+    const abs=M.map((_,i)=> usarMan&&man.abs[i]!=null?man.abs[i]: pA*plant[i]);
+    const vac=M.map((_,i)=> usarMan&&man.vac[i]!=null?man.vac[i]: pV*plant[i]);
+    const eve=M.map((_,i)=> usarMan&&man.eve[i]!=null?man.eve[i]: pE*plant[i]);
+    const base=M.map((_,i)=> plant[i]+abs[i]+vac[i]+eve[i]), nemp=M.map((_,i)=> puestos.reduce((acc,p)=> acc+(p[fteKey][i]||0),0));
+    return { plant,abs,vac,eve, unif:unif.slice(), nemp, sueldos:base.map(x=>x*0.7), segsoc:base.map(x=>x*0.3), uniformes:unif.slice(), total:M.map((_,i)=> base[i]+unif[i]) };
+  }
+  return { cur: esc('fte','sueldo',pAbs,pVac,pEve,true,unifCur),
+    ref: esc('fteFc','sueldoFc',P0.pct.absentismo,P0.pct.vacaciones,P0.pct.eventos,false,unifFc),
+    prev: esc('ftePrev','sueldoPrev',P0.pct.absentismo,P0.pct.vacaciones,P0.pct.eventos,false,unifPrev) };
+}
+function _tablaPersonal(cur, ref, prev){
+  const cel=(v,r,fmt)=>{ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`;
+    if(r!=null){ const dv=v-r, p=Math.abs(r)>0.5?dv/Math.abs(r)*100:0; const cls=dv<0?'up':'down';
+      h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } else h+='<span class="delta"></span>'; return h; };
+  const fila=(cls,label,serie,refserie,fmt)=> `<tr class="${cls}"><td class="lbl">${label}</td>`
+    + serie.map((v,i)=>`<td class="num mes">${cel(v, refserie?refserie[i]:null, fmt)}</td>`).join("")
+    + `<td class="num tot">${cel(sum(serie), refserie?sum(refserie):null, fmt)}</td></tr>`;
+  const c=cur, r=ref;
+  let b = fila('plant','Plantilla permanente', c.plant, r.plant)
+    + fila('','Absentismo', c.abs, null) + fila('','Vacaciones', c.vac, null) + fila('','Eventos', c.eve, null)
+    + fila('','Uniformidad', c.unif, null)
+    + fila('','Nº empleados (FTE)', c.nemp, r.nemp, n1)
+    + fila('total','TOTAL COSTE', c.total, r.total)
+    + fila('totalfc','TOTAL COSTE FORECAST', r.total, prev.total)
+    + `<tr class="rep"><td class="lbl" colspan="99">Reparto a USALI</td></tr>`
+    + fila('rep','Sueldos y salarios (70%)', c.sueldos, r.sueldos)
+    + fila('rep','Seguros Sociales (30%)', c.segsoc, r.segsoc)
+    + fila('rep','Uniformes', c.uniformes, r.uniformes)
+    + fila('totalfte','Total FTE', c.nemp, r.nemp, n1);
+  const cab='<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}<span class="delta"></span></th>`).join("")+'<th class="num tot">Año<span class="delta"></span></th>';
+  const t=document.createElement("table"); t.innerHTML=`<thead><tr>${cab}</tr></thead><tbody>${b}</tbody>`; return t;
+}
+$("btnExcel").addEventListener("click", ()=>{
+  if(!(window.SHG && SHG.nuevoLibro)) return;
+  const hs=D.hoteles.filter(hotelVisible); if(!hs.length) return;
+  const lib=SHG.nuevoLibro();
+  const cont=document.createElement("div"); cont.style.cssText="position:absolute;left:-9999px;top:0;"; document.body.appendChild(cont);
+  const push=(nombre,S)=>{ cont.innerHTML=""; const t=_tablaPersonal(S.cur,S.ref,S.prev); cont.appendChild(t); SHG.agregarHoja(lib, nombre, t); };
+  const SS=hs.map(h=>_seriesPersonal(h.id)).filter(Boolean);
+  const KEYS=['plant','abs','vac','eve','unif','nemp','total','sueldos','segsoc','uniformes'];
+  const sc=g=>{ const o={}; KEYS.forEach(k=> o[k]=M.map((_,i)=> SS.reduce((a,s)=> a+((s[g][k]||[])[i]||0),0))); return o; };
+  push("Agregado", { cur:sc('cur'), ref:sc('ref'), prev:sc('prev') });
+  hs.forEach(h=>{ const s=_seriesPersonal(h.id); if(s) push(h.nombre, s); });
+  document.body.removeChild(cont);
+  SHG.descargarLibro(lib, "Personal");
+});
 })();
 </script>
 </body>
