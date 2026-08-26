@@ -65,9 +65,9 @@
   tr.plant td.lbl { color:var(--gas); background:var(--gas-bg); }
   tr.total td { font-weight:800; font-size:14px; background:var(--tc-bg); }
   tr.total td.lbl { color:var(--tc); background:var(--tc-bg); }
-  tr.rep td { font-weight:700; background:var(--acc-bg); } tr.rep td.lbl { color:var(--acc); background:var(--acc-bg); }
-  tr.totalfc td { font-weight:700; background:var(--tcf-bg); } tr.totalfc td.lbl { color:var(--tcf); background:var(--tcf-bg); }
-  tr.totalfte td { font-weight:700; background:var(--tfte-bg); } tr.totalfte td.lbl { color:var(--tfte); background:var(--tfte-bg); }
+  tr.rep td { font-weight:700; background:var(--tcf-bg); } tr.rep td.lbl { color:var(--tcf); background:var(--tcf-bg); }
+  tr.totalfc td { font-weight:700; background:var(--acc-bg); } tr.totalfc td.lbl { color:var(--acc); background:var(--acc-bg); }
+  tr.totalfte td { font-weight:700; background:var(--tcf-bg); } tr.totalfte td.lbl { color:var(--tcf); background:var(--tcf-bg); }
   td.pctcol { border-left:1px solid var(--line); background:var(--bg); }
   .del { color:var(--neg); cursor:pointer; margin-right:6px; font-weight:700; }
   footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
@@ -131,6 +131,7 @@
       <div class="ctl"><label>% Absentismo</label><input type="number" id="pAbs" step="0.5"></div>
       <div class="ctl"><label>% Vacaciones</label><input type="number" id="pVac" step="0.5"></div>
       <div class="ctl"><label>% Eventos</label><input type="number" id="pEve" step="0.5"></div>
+      <div class="ctl"><label>Importe uniforme</label><input type="number" id="unifImp" step="10" title="Rellena todos los meses de Uniformidad con este importe; edita un mes para sobrescribirlo (queda en amarillo)"></div>
       <button class="btn" id="compR">Comprimir meses</button>
       <button class="btn on" id="btnDif" title="Muestra u oculta las diferencias y % de la línea Total Coste Forecast">Ocultar dif. Forecast</button>
       <button class="btn" id="btnExcel" title="Exporta un Excel con una pestaña por hotel y una de agregado">Exportar a Excel</button>
@@ -182,6 +183,8 @@ P.puestos.forEach(p => { p.fte = p.fteFc.slice(); p.sueldo = p.sueldoFc; });   /
 const PUESTOS_FC = P.puestos.map(p => ({ nombre:p.nombre, fteFc:(p.fteFc||[]).slice(),
   sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
 const unifManual = P.unifFc.slice();
+// Marca por mes de Uniformidad editada a mano (distinta del importe global); se colorea en amarillo.
+const unifEdit = Z().map(()=>false);
 const manual = { abs:Z().map(()=>null), vac:Z().map(()=>null), eve:Z().map(()=>null) };
 
 // ---- Autoguardado sobre la versión activa ----
@@ -190,6 +193,7 @@ function _activeVer(){ try{ const a=localStorage.getItem("shg_version_activa");
 function estadoPers(){ const cur=window._cur||{}; const arr=a=> Array.isArray(a)?a.slice():Z();
   return { puestos:P.puestos, pAbs:$("pAbs").value, pVac:$("pVac").value,
     pEve:$("pEve").value, manual:manual, unif:unifManual,
+    unifImp:$("unifImp").value, unifEdit:unifEdit,
     // Componentes publicados para la hoja de trabajo (Sueldos, Seg. Social, Uniformes).
     sueldosMes: arr(cur.sueldos), segsocMes: arr(cur.segsoc), uniformesMes: arr(cur.uniformes) }; }
 let _saveT=null;
@@ -210,6 +214,8 @@ function cargarPers(){ const a=_activeVer(); if(!a) return; try{
   if(s.pAbs!=null)$("pAbs").value=s.pAbs; if(s.pVac!=null)$("pVac").value=s.pVac; if(s.pEve!=null)$("pEve").value=s.pEve;
   if(s.manual){ ["abs","vac","eve"].forEach(k=>{ if(Array.isArray(s.manual[k])) s.manual[k].forEach((v,i)=>manual[k][i]=v); }); }
   if(Array.isArray(s.unif)) s.unif.forEach((v,i)=>unifManual[i]=v);
+  if(s.unifImp!=null)$("unifImp").value=s.unifImp;
+  if(Array.isArray(s.unifEdit)) s.unifEdit.forEach((v,i)=>unifEdit[i]=!!v);
 }catch(e){} }
 
 function plantillaMes(fteKey, sueldoKey){ return M.map((_,i)=> P.puestos.reduce((a,p)=> a + (p[fteKey][i]||0)*(p[sueldoKey]||0), 0)); }
@@ -247,7 +253,7 @@ function writeResumen(c, r){
   // filas % con input manual: escribir en los inputs
   ["abs","vac","eve"].forEach(k=>{ c[k].forEach((v,i)=>{ const e=$(k+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); e.classList.toggle("manual", manual[k][i]!=null); } });
     const t=$(k+"-t"); if(t) t.innerHTML=n0(sum(c[k]))+'<span class="delta"></span>'; });
-  c.unif.forEach((v,i)=>{ const e=$("unif-"+i); if(e && document.activeElement!==e) e.value=n0(v); });
+  c.unif.forEach((v,i)=>{ const e=$("unif-"+i); if(e){ if(document.activeElement!==e) e.value=n0(v); e.classList.toggle("manual", !!unifEdit[i]); } });
   $("unif-t").innerHTML=n0(sum(c.unif))+'<span class="delta"></span>';
   set("nemp", c.nemp, r.nemp, true, n1);
   set("total", c.total, r.total, true);
@@ -287,18 +293,20 @@ $("cuerpoR").innerHTML =
   + filaR("totalfte","ftetot","Total FTE",false);
 
 // ---- Construcción tabla puestos ----
-$("cabP").innerHTML='<th class="lbl">Puesto</th>'+M.map(m=>`<th class="num mes">${m}</th>`).join("")+'<th class="num tot">Sueldo €/FTE</th>';
+$("cabP").innerHTML='<th class="lbl">Puesto</th>'+M.map(m=>`<th class="num mes">${m}</th>`).join("")+'<th class="num tot">Total FTE</th><th class="num tot">Sueldo €/FTE</th>';
 function writePuestos(){
   $("cuerpoP").innerHTML = P.puestos.map((p,pi)=>{
     const refFte = RB()==="prev"?p.ftePrev:p.fteFc;
     const celdasFte = M.map((_,i)=>`<td class="num mes fte"><input class="c" data-pi="${pi}" data-m="${i}" value="${p.fte[i]?n1(p.fte[i]):''}"><span class="ref">${refFte[i]?n1(refFte[i]):''}</span></td>`).join("");
     return `<tr><td class="lbl"><span class="del" data-del="${pi}">×</span><input class="c" style="width:150px;text-align:left" data-nom="${pi}" value="${p.nombre.replace(/"/g,'&quot;')}"></td>`
-      + celdasFte + `<td class="num tot"><input class="c" data-sue="${pi}" value="${p.sueldo?n0(p.sueldo):''}"></td></tr>`;
+      + celdasFte + `<td class="num tot totfte" id="ptot-${pi}">${sum(p.fte)?n1(sum(p.fte)):''}</td>`
+      + `<td class="num tot"><input class="c" data-sue="${pi}" value="${p.sueldo?n0(p.sueldo):''}"></td></tr>`;
   }).join("");
   enlazarPuestos();
 }
 function enlazarPuestos(){
-  document.querySelectorAll('input.c[data-pi]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.pi].fte[+inp.dataset.m]=parse(inp.value)||0; recomputeSoloResumen(); guardarPers(); }));
+  document.querySelectorAll('input.c[data-pi]').forEach(inp=>inp.addEventListener("input",()=>{ const pi=inp.dataset.pi; P.puestos[pi].fte[+inp.dataset.m]=parse(inp.value)||0;
+    const tot=$("ptot-"+pi); if(tot) tot.textContent = sum(P.puestos[pi].fte)?n1(sum(P.puestos[pi].fte)):''; recomputeSoloResumen(); guardarPers(); }));
   document.querySelectorAll('input.c[data-sue]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.sue].sueldo=parse(inp.value)||0; recomputeSoloResumen(); guardarPers(); }));
   document.querySelectorAll('input.c[data-nom]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.nom].nombre=inp.value; guardarPers(); }));
   document.querySelectorAll('.del').forEach(x=>x.addEventListener("click",()=>{ P.puestos.splice(+x.dataset.del,1); recompute(); guardarPers(); }));
@@ -312,10 +320,14 @@ pintarSelHotel();   // selector = hoteles de la versión permitidos (definida m�
 ["abs","vac","eve"].forEach(k=>{ for(let i=0;i<12;i++){ /* inputs creados; listeners abajo */ } });
 document.querySelectorAll('#cuerpoR input.c').forEach(inp=>{
   inp.addEventListener("input",()=>{ const p=inp.dataset.p, m=+inp.dataset.m, v=inp.value.trim()===""?null:parse(inp.value);
-    if(p==="unif"){ unifManual[m]= v==null?0:v; } else { manual[p][m]=v; } recomputeSoloResumen(); guardarPers(); });
+    if(p==="unif"){ if(v==null){ unifManual[m]=parseFloat($("unifImp").value)||0; unifEdit[m]=false; } else { unifManual[m]=v; unifEdit[m]=true; } }
+    else { manual[p][m]=v; } recomputeSoloResumen(); guardarPers(); });
   inp.addEventListener("blur",()=>{ const p=inp.dataset.p, m=+inp.dataset.m; if(p!=="unif" && manual[p][m]==null){ inp.value=n0(window._cur[p][m]); inp.classList.remove("manual"); } });
 });
 ["pAbs","pVac","pEve"].forEach(id=>$(id).addEventListener("input",()=>{ recomputeSoloResumen(); guardarPers(); }));
+// Importe uniforme: rellena todos los meses de Uniformidad y quita las marcas manuales.
+$("unifImp").addEventListener("input",()=>{ const g=parseFloat($("unifImp").value)||0;
+  for(let i=0;i<12;i++){ unifManual[i]=g; unifEdit[i]=false; } recomputeSoloResumen(); guardarPers(); });
 $("refBase").addEventListener("change",recompute);
 $("compR").addEventListener("click",()=>{ const s1=$("tR").classList.toggle("solo-anual"); $("tP").classList.toggle("solo-anual",s1);
   $("compR").textContent=s1?"Ver meses":"Comprimir meses"; $("compR").classList.toggle("on",s1); });
@@ -418,12 +430,16 @@ function _tablaPersonal(cur, ref, prev, puestos){
     + fila('rep','Seguros Sociales (30%)', c.segsoc, r.segsoc)
     + fila('rep','Uniformes', c.uniformes, r.uniformes)
     + fila('totalfte','Total FTE', c.nemp, r.nemp, n1);
-  // Apartado de puestos (FTE por mes y sueldo €/FTE) igual que en la ventana; solo en hojas de hotel.
+  // Apartado de puestos (FTE por mes, Total FTE y sueldo €/FTE) igual que en la ventana; solo en hojas de hotel.
   if(puestos && puestos.length){
-    b += `<tr class="rep"><td class="lbl" colspan="99">Puestos · FTE por mes (columna final: sueldo €/FTE)</td></tr>`;
-    b += puestos.map(p=> `<tr><td class="lbl">${String(p.nombre||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</td>`
-      + p.fte.map(v=>`<td class="num mes">${v?n1(v):''}</td>`).join("")
-      + `<td class="num tot">${p.sueldo?n0(p.sueldo):''}</td></tr>`).join("");
+    const esc=s=>String(s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    b += `<tr class="espacio"><td class="lbl"></td>${M.map(()=>'<td></td>').join("")}<td></td><td></td></tr>`;   // línea en blanco
+    b += `<tr class="rep"><td class="lbl">Puestos · FTE por mes</td>${M.map(m=>`<td class="num mes">${m}</td>`).join("")}<td class="num tot">Total FTE</td><td class="num tot">Sueldo €/FTE</td></tr>`;
+    b += puestos.map(p=>{ const tot=p.fte.reduce((a,v)=>a+(v||0),0);
+      return `<tr><td class="lbl">${esc(p.nombre)}</td>`
+        + p.fte.map(v=>`<td class="num mes">${v?n1(v):''}</td>`).join("")
+        + `<td class="num tot">${tot?n1(tot):''}</td>`
+        + `<td class="num tot">${p.sueldo?n0(p.sueldo):''}</td></tr>`; }).join("");
   }
   const cab='<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}<span class="delta"></span></th>`).join("")+'<th class="num tot">Año<span class="delta"></span></th>';
   const t=document.createElement("table"); t.innerHTML=`<thead><tr>${cab}</tr></thead><tbody>${b}</tbody>`; return t;
