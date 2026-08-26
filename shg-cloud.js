@@ -346,6 +346,17 @@
     return _datosPromesa;
   }
 
+  // Descarga un fichero de datos concreto (p. ej. "calidad") en cualquier modo. A diferencia de
+  // datos(), no está ligado a la página actual: en nube espera a que pase la puerta y lo baja.
+  async function datosDe(pagina) {
+    if (!_modoNube()) {
+      var r = await fetch("datos/" + pagina + ".json");
+      return r.ok ? r.json() : null;
+    }
+    try { await _datosPromesa; return await descargarDatosSP(pagina); }   // puerta pasada → hay token
+    catch (e) { return null; }
+  }
+
   // ---- Permisos de usuario (lista blanca Presupuesto_Usuarios) ----
   var _sesion = null;              // permisos resueltos del usuario logueado
   var PAGINAS_TODAS = "todas";
@@ -636,10 +647,35 @@
   function exportarExcel(tabla, nombre, opts) {
     var L = _nuevoLibro(); agregarHoja(L, (opts && opts.hoja) || "Datos", tabla, opts); descargarLibro(L, nombre);
   }
+  // Exporta un listado (cabeceras + filas de arrays) a un .xlsx SIN estilos por celda:
+  // no lee getComputedStyle, así que es rápido para miles de filas (feeds de Power BI).
+  // Celdas: número -> numérica; texto -> inlineStr; null/"" -> se omite (columna vacía).
+  function exportarDatos(nombre, headers, filas, hoja) {
+    var L = _nuevoLibro();
+    var xfCab = L.xfId(L.fontId("", true), 0, 0, "left");
+    var fila = function (r, arr, cab) {
+      var s = "";
+      arr.forEach(function (v, ci) {
+        if (v == null || v === "") return;
+        var ref = _colName(ci) + r;
+        if (cab) s += '<c r="' + ref + '" s="' + xfCab + '" t="inlineStr"><is><t>' + _xmlesc(String(v)) + "</t></is></c>";
+        else if (typeof v === "number" && isFinite(v)) s += '<c r="' + ref + '"><v>' + v + "</v></c>";
+        else s += '<c r="' + ref + '" t="inlineStr"><is><t>' + _xmlesc(String(v)) + "</t></is></c>";
+      });
+      return '<row r="' + r + '">' + s + "</row>";
+    };
+    var xml = fila(1, headers, true);
+    for (var i = 0; i < filas.length; i++) xml += fila(i + 2, filas[i], false);
+    L.hojas.push({ nombre: String(hoja || "Datos").slice(0, 31), xml:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      "<sheetData>" + xml + "</sheetData></worksheet>" });
+    descargarLibro(L, nombre);
+  }
 
   window.SHG = {
     init: init, login: login, logout: logout, cuenta: cuenta,
-    exportarExcel: exportarExcel, nuevoLibro: _nuevoLibro, agregarHoja: agregarHoja, descargarLibro: descargarLibro,
+    exportarExcel: exportarExcel, exportarDatos: exportarDatos, nuevoLibro: _nuevoLibro, agregarHoja: agregarHoja, descargarLibro: descargarLibro,
     graphCall: graphCall, getSiteId: getSiteId, getListId: getListId,
     getCols: getCols, interno: interno,
     leerItems: leerItems, crearItem: crearItem, actualizarItem: actualizarItem, borrarItem: borrarItem,
@@ -647,6 +683,6 @@
     autoSync: autoSync, conectado: conectado,
     cargarSesion: cargarSesion, sesion: sesion, puerta: puerta,
     paginaPermitida: paginaPermitida, hotelPermitido: hotelPermitido,
-    datos: datos,
+    datos: datos, datosDe: datosDe,
   };
 })();

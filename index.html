@@ -90,8 +90,8 @@
 </head>
 <body>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-  <script src="config.js?v=13"></script>
-  <script src="shg-cloud.js?v=13"></script>
+  <script src="config.js?v=16"></script>
+  <script src="shg-cloud.js?v=16"></script>
   <script>window.SHG && SHG.autoSync && SHG.autoSync("index");</script>
   <span class="ab-nube" id="abNube">Nube: comprobando…</span>
   <div class="wrap">
@@ -124,6 +124,7 @@
         <span class="badge" id="vBadge">—</span>
         <span class="vmeta" id="vMeta"></span>
         <span style="flex:1"></span>
+        <button class="btn" id="btnPowerBI" title="Exporta el presupuesto 2027 de la versión activa en la estructura de Datos_Ppto26 (para Power BI)">Exportar a Power BI</button>
         <button class="btn" id="btnGuardarComo">Guardar como versión nueva</button>
         <button class="btn" id="btnCambiar">Cambiar de versión</button>
         <button class="btn danger" id="btnEliminar" title="Elimina esta versión (metadatos y ajustes por hotel). No se puede deshacer.">Eliminar versión</button>
@@ -412,6 +413,60 @@ document.querySelectorAll("[data-hall]").forEach(b=> b.addEventListener("click",
 // Selector de fecha de auditoría: al cambiar, recalcula el impacto estimado.
 $("mesAud").addEventListener("change", ()=>{
   mesAud = $("mesAud").value==="" ? null : +$("mesAud").value; pintarKpis(); avisarPendiente(); });
+
+// ---- Exportación del presupuesto 2027 para Power BI (estructura Datos_Ppto26) ----
+// Calcula el ppto por nodo USALI de la versión activa (misma lógica que Por Partida) y
+// vuelca una fila por (entidad, concepto) con su primera cuenta contable.
+function _versionActiva(){ const a=localStorage.getItem(LS_ACT), vs=leerVersiones(); return a&&vs[a]?vs[a]:null; }
+const PB_HEADERS = ["Cuenta","ID_Resumen","ID_Detalle","Línea-Año-Hotel","Línea-Año-Zona","Línea-Año-País","Full",
+  "Sucursal","Sucursal.1","Año","Account","Proyecto","AcctName",
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+async function exportarPowerBI(){
+  const btn=$("btnPowerBI"); btn.disabled=true; const txt=btn.textContent; btn.textContent="Generando…";
+  try{
+    const PB = window.SHG && SHG.datosDe ? await SHG.datosDe("powerbi") : null;
+    if(!PB || !PB.hoteles){ alert("No se pudieron cargar los datos para Power BI. Regenera y publica los datos."); return; }
+    const v=_versionActiva(); const Z=()=>new Array(12).fill(0);
+    const HIJOS={}; PB.nodos.forEach(n=>{ if(n.p!==n.i)(HIJOS[n.p]=HIJOS[n.p]||[]).push(n.i); });
+    const _SUB={}; const sub=id=>{ if(_SUB[id])return _SUB[id]; const o=[id],p=[id]; while(p.length){const x=p.pop();(HIJOS[x]||[]).forEach(h=>{o.push(h);p.push(h);});} return _SUB[id]=o; };
+    const arrSet=new Set(sub(PB.nodoArrendamientos)), ING=new Set(PB.ingresoIds);
+    const CAT={}; (PB.catNodos||[]).forEach(c=> sub(c.nodo).forEach(n=>{ if(c.clave==="otros_no_op"&&arrSet.has(n))return; CAT[n]=c.clave; }));
+    const N = v && typeof v.mesAuditado==="number" ? v.mesAuditado : null;
+    const incFrac=(cat,idHotel)=>{ if(!v||!cat)return 0; const o=(v.overrides&&v.overrides[idHotel])||{}; if(cat in o)return o[cat];
+      if(cat==="alojamiento"){ const a=v.alojamiento&&v.alojamiento[idHotel]; const inc=a&&+a.incIng; if(inc)return inc/100; }
+      return (v.incrementos&&v.incrementos[cat])||0; };
+    const fcNodo=h=>{ if(N===null || !h.realMes || !h.pptoMes) return h.fc;
+      const out={}, ids=new Set(Object.keys(h.realMes).concat(Object.keys(h.pptoMes)));
+      ids.forEach(id=>{ const r=h.realMes[id],p=h.pptoMes[id],a=Z(); for(let m=0;m<12;m++)a[m]=(m<N?(r?r[m]:0):(p?p[m]:0)); out[id]=a; }); return out; };
+    const fcCat=FN=>{ const out={}; Object.keys(FN).forEach(id=>{ const cat=CAT[id]; if(!cat)return; if(!out[cat])out[cat]=Z();
+      const s=FN[id], sg=ING.has(+id)?-1:1; for(let m=0;m<12;m++)out[cat][m]+=sg*s[m]; }); return out; };
+    const incluido = id => !v || !Array.isArray(v.hoteles) || v.hoteles.indexOf(id)!==-1;
+    const filas=[];
+    PB.hoteles.forEach(h=>{ if(!incluido(h.id)) return;
+      const FN=fcNodo(h), FCC=fcCat(FN);
+      const pc = v && v.pptoCat && v.pptoCat[h.id];
+      const mapaCuenta = (PB.cuentaPorNodo && PB.cuentaPorNodo[String(h.plan)]) || {};
+      Object.keys(FN).forEach(id=>{
+        const cat=CAT[id], s=FN[id], ppto=Z();
+        for(let m=0;m<12;m++){ let f;
+          if(pc && cat && Array.isArray(pc[cat]) && FCC[cat] && FCC[cat][m]) f=pc[cat][m]/FCC[cat][m];
+          else f=1+incFrac(cat,h.id);
+          ppto[m]=s[m]*f; }
+        if(!ppto.some(x=>Math.abs(x)>0.5)) return;   // omite nodos sin importe
+        const cuenta = mapaCuenta[id] || ["",""];
+        const fila = new Array(25).fill("");
+        fila[7]=h.nomHotel||""; fila[8]=h.nomSociedad||""; fila[9]=PB.anio;
+        fila[10]=cuenta[0]; fila[12]=cuenta[1];
+        for(let m=0;m<12;m++) fila[13+m]=Math.round(ppto[m]*100)/100;
+        filas.push(fila);
+      });
+    });
+    if(!filas.length){ alert("No hay importes de presupuesto para exportar en esta versión."); return; }
+    SHG.exportarDatos("Datos_Ppto"+PB.anio, PB_HEADERS, filas, "Datos_Ppto"+PB.anio);
+  } catch(e){ console.error("Power BI:", e); alert("Error al generar el listado: "+((e&&e.message)||e)); }
+  finally{ btn.disabled=false; btn.textContent=txt; }
+}
+$("btnPowerBI").addEventListener("click", exportarPowerBI);
 
 // Arranque: si hay versión activa guardada, reanudarla; si no, mostrar el inicio.
 pintarIncs(); pintarReglas(); pintarHoteles(); pintarMesAud(); pintarKpis(); pintarSelector(); pintarTabs();
