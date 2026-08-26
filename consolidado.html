@@ -65,6 +65,16 @@
   tr.tR td { font-weight:800; background:var(--res-bg); } tr.tR td.lbl { color:var(--res); }
   tr.stat td { color:var(--muted); } tr.stat td.lbl { font-style:italic; }
   footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
+  .elim-panel { margin:0 0 12px; padding:10px 12px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; box-shadow:var(--shadow); font-size:12.5px; }
+  .elim-cuadre { font-weight:700; padding:4px 8px; border-radius:7px; margin-bottom:8px; display:inline-block; }
+  .elim-cuadre.ok { color:var(--res); background:var(--res-bg); }
+  .elim-cuadre.ko { color:var(--neg); background:rgba(192,57,43,.10); }
+  .elim-vacio { color:var(--muted); }
+  .elim-tbl { width:100%; border-collapse:collapse; }
+  .elim-tbl th, .elim-tbl td { text-align:left; padding:4px 10px; border-bottom:1px solid var(--line); }
+  .elim-tbl th.num, .elim-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .elim-tbl .ext { color:var(--muted); font-size:11px; }
 </style>
 </head>
 <body>
@@ -119,13 +129,15 @@
 
   <div class="wrap">
     <h1>Presupuesto 2027 · Consolidado</h1>
-    <div class="sub">Hoteles en horizontal. El Ppto 2027 aplica los incrementos por categoría de la versión activa sobre el forecast (sin versión = forecast). Consolidado = agregado (pendiente eliminación intragrupo).</div>
+    <div class="sub">Hoteles en horizontal. El Ppto 2027 aplica los incrementos por categoría de la versión activa sobre el forecast (sin versión = forecast). <b>Consolidado = Agregado − eliminaciones intragrupo</b>; el Resultado Neto de ambas columnas debe coincidir.</div>
     <div class="controls">
       <div class="dd"><button class="btn" id="ddBtn">Hoteles ▾</button><div id="sel" class="dd-panel"></div></div>
       <button class="btn" id="expAll">Expandir meses</button>
       <button class="btn" id="compAll">Comprimir</button>
       <button class="btn" id="expExcel">Exportar a Excel</button>
+      <button class="btn" id="btnElim">Eliminaciones ▾</button>
     </div>
+    <div id="elimPanel" class="elim-panel" hidden></div>
     <div class="card"><table id="t"><thead id="cab"></thead><tbody id="cuerpo"></tbody></table></div>
     <footer>App de Presupuestos SHG · vista consolidada · la selección de hoteles se define en la versión y se ajusta aquí</footer>
   </div>
@@ -223,13 +235,47 @@ function actualizarBtn(){ $("ddBtn").textContent=`Hoteles (${HOT.filter(h=>sel[h
 $("ddBtn").addEventListener("click", e=>{ e.stopPropagation(); $("sel").classList.toggle("open"); });
 document.addEventListener("click", e=>{ if(!e.target.closest(".dd")) $("sel").classList.remove("open"); });
 
+// ---- Eliminaciones intragrupo (solo columna Consolidado) ----
+// Índice de fila por categoría (para localizar la fila de ingreso/coste a ajustar).
+const catRowIdx = {}; D.filasCat.forEach((cat,fi)=>{ if(cat && catRowIdx[cat]==null) catRowIdx[cat]=fi; });
+const IDX_TR = D.filas.findIndex(f=>f.tipo==="tR");   // Resultado Neto (cuadre maestro)
+function esReglaActiva(clave){ const v=activeVersion();
+  const inact = v && v.consolidacion && v.consolidacion.inactivas;
+  return !(Array.isArray(inact) && inact.indexOf(clave)>=0); }
+// Calcula el ajuste por categoría (delta negativo) y el detalle de las eliminaciones activas.
+function eliminaciones(hs){
+  const adj={}, det=[]; const reglas=D.reglasElim||[];
+  const restar=(cat,serie)=>{ const a=adj[cat]||(adj[cat]=Z()); for(let m=0;m<12;m++) a[m]-=serie[m]; };
+  reglas.forEach(r=>{ if(!esReglaActiva(r.clave)) return;
+    const fi=catRowIdx[r.catIng]; if(fi==null) return;
+    const emis=hs.filter(h=> h.idSoc===r.emisor);
+    if(!emis.length) return;
+    const X=emis.reduce((a,h)=> suma(a,h.filas[fi]), Z());
+    if(!X.some(v=>Math.abs(v)>0.5)) return;
+    restar(r.catIng, X); restar(r.catCoste, X);   // −X ingreso, −X coste (neutral en resultado)
+    det.push({clave:r.clave, desc:r.desc, catIng:r.catIng, catCoste:r.catCoste, importe:sum(X), neto0:r.neto0}); });
+  return {adj, det};
+}
+// Filas de la columna Consolidado = Agregado con las eliminaciones aplicadas y totales recalculados.
+function filasConsolidado(agg, adj){
+  const cv={}; D.catClaves.forEach(k=>{ const fi=catRowIdx[k]; let s=(fi!=null?agg[fi].slice():Z());
+    if(adj[k]) s=suma(s,adj[k]); cv[k]=s; });
+  const sumc=list=> list.reduce((acc,k)=> acc.map((v,i)=>v+cv[k][i]), Z());
+  const tI=sumc(D.catIngresos), tG=sumc(D.catOperativos), gop=tI.map((v,i)=>v-tG[i]);
+  const mf=cv.management_fees, alq=cv.arrendamientos, onp=cv.otros_no_op, soc=cv.societarios;
+  const eb=gop.map((v,i)=>v-mf[i]-alq[i]-onp[i]), rn=eb.map((v,i)=>v-soc[i]);
+  return D.filasCat.map((cat,fi)=>{ if(cat) return cv[cat].slice();
+    const t=D.filas[fi].tipo; return t==="tI"?tI: t==="tG"?tG: t==="tP"?gop: t==="tE"?eb: t==="tR"?rn: Z(); });
+}
 function columnas(){
   const hs = HOT.filter(h=> sel[h.id]);
   const suf=(cond)=> D.filas.map((_,fi)=> hs.filter(cond).reduce((a,h)=> suma(a,h.filas[fi]), Z()));
   const agg=suf(()=>true), hot=suf(h=>h.hotelera), noh=suf(h=>!h.hotelera);
+  const elim=eliminaciones(hs), consol=filasConsolidado(agg, elim.adj);
+  window._elim = elim;   // para el panel de cuadre
   const oc=(cond,k)=> hs.filter(cond).reduce((a,h)=>suma(a,h[k]),Z());
   const cols=[
-    {label:"Consolidado",key:"b0",b:"b0",cons:true,fila:fi=>agg[fi],ocu:oc(()=>true,"ocupadas"),disp:oc(()=>true,"disponibles")},
+    {label:"Consolidado",key:"b0",b:"b0",cons:true,fila:fi=>consol[fi],ocu:oc(()=>true,"ocupadas"),disp:oc(()=>true,"disponibles")},
     {label:"Agregado",   key:"b1",b:"b1",cons:true,fila:fi=>agg[fi],ocu:oc(()=>true,"ocupadas"),disp:oc(()=>true,"disponibles")},
     {label:"Hoteles",    key:"b2",b:"b2",cons:true,fila:fi=>hot[fi],ocu:oc(h=>h.hotelera,"ocupadas"),disp:oc(h=>h.hotelera,"disponibles")},
     {label:"No hoteles", key:"b3",b:"b3",cons:true,fila:fi=>noh[fi],ocu:Z(),disp:Z()},
@@ -278,8 +324,28 @@ function render(){
   body+=statRow("ADR €", (c,m)=> c.ocu[m]? n0(alo(c)[m]/c.ocu[m])+" €":"—", c=> sum(c.ocu)? n0(sum(alo(c))/sum(c.ocu))+" €":"—");
   body+=statRow("RevPAR €", (c,m)=> c.disp[m]? n0(alo(c)[m]/c.disp[m])+" €":"—", c=> sum(c.disp)? n0(sum(alo(c))/sum(c.disp))+" €":"—");
   $("cuerpo").innerHTML=body;
+  pintarElim(cols);
+}
+// Panel de eliminaciones + control de cuadre (Resultado Consolidado = Agregado).
+const CATLBL={mf_ing:"MF y otros servicios",varios:"Varios",management_fees:"Management fees",
+  mantenimiento:"Mantenimiento",arrendamientos:"Arrendamientos"};
+function pintarElim(cols){
+  const el=$("elimPanel"), det=(window._elim||{}).det||[];
+  const b0=cols.find(c=>c.key==="b0"), b1=cols.find(c=>c.key==="b1");
+  const rnC=sum(b0.fila(IDX_TR)), rnA=sum(b1.fila(IDX_TR)), cuadra=Math.abs(rnC-rnA)<1;
+  let h=`<div class="elim-cuadre ${cuadra?'ok':'ko'}">Cuadre · Resultado Consolidado ${n0(rnC)} € `
+    + `${cuadra?'=':'≠'} Agregado ${n0(rnA)} €${cuadra?' ✓':' ✕ descuadre '+n0(rnC-rnA)+' €'}</div>`;
+  if(!det.length){ h+='<div class="elim-vacio">No hay eliminaciones activas en la selección actual.</div>'; }
+  else{ h+='<table class="elim-tbl"><thead><tr><th>Eliminación</th><th>Ingreso (−)</th><th>Coste (−)</th><th class="num">Importe año</th></tr></thead><tbody>';
+    det.forEach(d=>{ h+=`<tr><td>${d.desc}</td><td>${CATLBL[d.catIng]||d.catIng}</td>`
+      + `<td>${CATLBL[d.catCoste]||d.catCoste}${d.neto0?'':' <span class="ext">(deja externo)</span>'}</td>`
+      + `<td class="num">${n0(d.importe)} €</td></tr>`; });
+    h+='</tbody></table>'; }
+  el.innerHTML=h;
 }
 
+$("btnElim").addEventListener("click",()=>{ const p=$("elimPanel"); p.hidden=!p.hidden;
+  $("btnElim").textContent = p.hidden ? "Eliminaciones ▾" : "Eliminaciones ▴"; });
 $("cab").addEventListener("click", e=>{ const cx=e.target.closest(".cx"); if(!cx) return; exp[cx.dataset.k]=!exp[cx.dataset.k]; render(); });
 $("expAll").addEventListener("click",()=>{ columnas().forEach(c=> exp[c.key]=true); render(); });
 $("compAll").addEventListener("click",()=>{ Object.keys(exp).forEach(k=> exp[k]=false); render(); });

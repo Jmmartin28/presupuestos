@@ -137,8 +137,9 @@ const ING = new Set(D.ingresoIds);
 // Mapa de hijos para recorrer el subárbol USALI.
 const HIJOS = {};
 D.nodos.forEach(n=>{ if(n.p!==n.i){ (HIJOS[n.p]=HIJOS[n.p]||[]).push(n.i); } });
-function subarbol(id){ const out=[id], pila=[id]; while(pila.length){ const x=pila.pop();
-  (HIJOS[x]||[]).forEach(h=>{ out.push(h); pila.push(h); }); } return out; }
+const _SUB = {};   // memo de subárboles (la jerarquía es estática)
+function subarbol(id){ if(_SUB[id]) return _SUB[id]; const out=[id], pila=[id]; while(pila.length){ const x=pila.pop();
+  (HIJOS[x]||[]).forEach(h=>{ out.push(h); pila.push(h); }); } return _SUB[id]=out; }
 
 // ---- Versión activa: el Ppto = forecast por categoría con sus incrementos ----
 function activeVersion(){ try{ const a=localStorage.getItem("shg_version_activa");
@@ -219,10 +220,18 @@ function _serieRaw(h, key, ids){
   });
   return acc;
 }
+// Ajuste del MF de la Central (Ppto), en signo raw: SUSTITUYE su mf_ing propio por el MF
+// sintético (Σ MF de las hoteleras), igual que Análisis/Consolidado. Resta el propio y suma
+// el sintético; si solo se sumara, el MF se contaría dos veces y el Ppto saldría inflado.
+function ajusteMfCentralRaw(h, key){
+  const propio = NODO_MF_ING!=null ? _serieRaw(h, key, subarbol(NODO_MF_ING)) : Z();
+  const mf = mfCentralPptoMes();
+  return Z().map((_,m)=> -mf[m] - propio[m]);
+}
 // Ingresos en positivo (con el ingreso MF intragrupo de la Central en el Ppto).
 function ingresosPos(h, key){
   const acc = _serieRaw(h, key, subarbol(D.pyl.ingresos));
-  if(key==="ppto" && h.esCentral){ const mf=mfCentralPptoMes(); for(let m=0;m<12;m++) acc[m] += -mf[m]; }
+  if(key==="ppto" && h.esCentral){ const aj=ajusteMfCentralRaw(h, key); for(let m=0;m<12;m++) acc[m] += aj[m]; }
   return acc.map(x=> -x);
 }
 // Márgenes del P&L (GOP/EBITDA/RN): los nodos-margen no tienen datos propios, se calculan.
@@ -241,9 +250,9 @@ function serie(h, key){                    // 12 meses de la partida (nodo o mar
   const tipoMargen = D.margenNodos && D.margenNodos[String(nodo)];
   if(tipoMargen) return serieMargen(h, key, tipoMargen);
   const ids = subarbol(nodo), esPpto = key==="ppto", acc = _serieRaw(h, key, ids);
-  // Central: en el Ppto, el ingreso de Management Fees = Σ MF (coste) de hoteleras.
+  // Central: en el Ppto, el ingreso de Management Fees = Σ MF (coste) de hoteleras (sustituye el propio).
   if(esPpto && h.esCentral && NODO_MF_ING!=null && ids.indexOf(NODO_MF_ING)>=0){
-    const mf=mfCentralPptoMes(); for(let m=0;m<12;m++) acc[m] += -mf[m];   // signo raw (antes del flip)
+    const aj=ajusteMfCentralRaw(h, key); for(let m=0;m<12;m++) acc[m] += aj[m];   // signo raw (antes del flip)
   }
   if(ING.has(nodo)) for(let m=0;m<12;m++) acc[m] = -acc[m];   // ingresos en positivo
   return acc;
@@ -264,12 +273,16 @@ function pintarAmbito(){
   $("ambito").value = ambito;
   $("ambito").addEventListener("change", ()=>{ ambito = $("ambito").value; render(); });
 }
-function agrupa(cond){ const acc=Z(); visibles().filter(cond).forEach(h=>{ const s=serie(h,esc);
+// Cache de serie por hotel dentro de un render (evita recalcular en cada comparación del
+// ordenado y en cada total; los márgenes son caros de calcular).
+let SER = new Map();
+function serieCache(h){ let s=SER.get(h); if(!s){ s=serie(h,esc); SER.set(h,s); } return s; }
+function agrupa(cond){ const acc=Z(); visibles().filter(cond).forEach(h=>{ const s=serieCache(h);
   for(let m=0;m<12;m++) acc[m]+=s[m]; }); return acc; }
 
 function valorOrden(h){
   if(sortKey==="nombre") return h.nombre;
-  const s=serie(h,esc); return sortKey==="anio" ? sum(s) : s[sortKey];
+  const s=serieCache(h); return sortKey==="anio" ? sum(s) : s[sortKey];
 }
 function ordenar(lista){
   return lista.slice().sort((a,b)=>{
@@ -286,6 +299,7 @@ function filaHTML(nombre, s, cls){
 }
 
 function render(){
+  SER = new Map();   // recalcula la serie una sola vez por hotel en este render
   const flecha = k => k===sortKey ? (sortDir===1?" ▲":" ▼") : "";
   let head = `<tr><th class="cod txt sortable" data-k="nombre">Hotel${flecha("nombre")}</th>`;
   M.forEach((m,i)=> head += `<th class="sortable" data-k="${i}">${m}${flecha(i)}</th>`);
@@ -293,10 +307,10 @@ function render(){
   $("cab").innerHTML = head + "</tr>";
 
   let body = "";
-  ordenar(visibles().filter(h=>h.hotelera)).forEach(h=> body += filaHTML(h.nombre, serie(h,esc)));
+  ordenar(visibles().filter(h=>h.hotelera)).forEach(h=> body += filaHTML(h.nombre, serieCache(h)));
   body += filaHTML("TOTAL HOTELES", agrupa(h=>h.hotelera), "tsub");
   body += `<tr class="sep"><td colspan="14"></td></tr>`;
-  ordenar(visibles().filter(h=>!h.hotelera)).forEach(h=> body += filaHTML(h.nombre, serie(h,esc)));
+  ordenar(visibles().filter(h=>!h.hotelera)).forEach(h=> body += filaHTML(h.nombre, serieCache(h)));
   body += filaHTML("TOTAL NO HOTELES", agrupa(h=>!h.hotelera), "tsub");
   body += filaHTML("TOTAL AGREGADO", agrupa(()=>true), "tot");
   $("cuerpo").innerHTML = body;

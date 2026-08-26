@@ -67,7 +67,7 @@
   tr.total td.lbl { color:var(--tc); background:var(--tc-bg); }
   tr.rep td { font-weight:700; background:var(--tcf-bg); } tr.rep td.lbl { color:var(--tcf); background:var(--tcf-bg); }
   tr.totalfc td { font-weight:700; background:var(--acc-bg); } tr.totalfc td.lbl { color:var(--acc); background:var(--acc-bg); }
-  tr.totalfte td { font-weight:700; background:var(--tcf-bg); } tr.totalfte td.lbl { color:var(--tcf); background:var(--tcf-bg); }
+  tr.totalfte td { font-weight:700; background:var(--tfte-bg); } tr.totalfte td.lbl { color:var(--tfte); background:var(--tfte-bg); }
   td.pctcol { border-left:1px solid var(--line); background:var(--bg); }
   .del { color:var(--neg); cursor:pointer; margin-right:6px; font-weight:700; }
   footer { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
@@ -246,22 +246,24 @@ function celD(v, r, fmt){ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`; if(r!=nul
   h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } return h; }
 
 function writeResumen(c, r){
-  const set = (id, serie, refserie, delta, fmt)=>{ fmt=fmt||n0;
+  // avgTot: el total del año es el PROMEDIO de los 12 meses (FTE), no el sumatorio.
+  const set = (id, serie, refserie, delta, fmt, avgTot)=>{ fmt=fmt||n0;
     serie.forEach((v,i)=>{ const e=$(id+"-"+i); if(e) e.innerHTML = (delta&&refserie)?celD(v,refserie[i],fmt):fmt(v)+'<span class="delta"></span>'; });
-    const t=$(id+"-t"); if(t) t.innerHTML = (delta&&refserie)?celD(sum(serie),sum(refserie),fmt):fmt(sum(serie))+'<span class="delta"></span>'; };
+    const tv = avgTot ? sum(serie)/12 : sum(serie), rv = refserie ? (avgTot ? sum(refserie)/12 : sum(refserie)) : null;
+    const t=$(id+"-t"); if(t) t.innerHTML = (delta&&refserie)?celD(tv,rv,fmt):fmt(tv)+'<span class="delta"></span>'; };
   set("plant", c.plant, r.plant, true);
   // filas % con input manual: escribir en los inputs
   ["abs","vac","eve"].forEach(k=>{ c[k].forEach((v,i)=>{ const e=$(k+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); e.classList.toggle("manual", manual[k][i]!=null); } });
     const t=$(k+"-t"); if(t) t.innerHTML=n0(sum(c[k]))+'<span class="delta"></span>'; });
   c.unif.forEach((v,i)=>{ const e=$("unif-"+i); if(e){ if(document.activeElement!==e) e.value=n0(v); e.classList.toggle("manual", !!unifEdit[i]); } });
   $("unif-t").innerHTML=n0(sum(c.unif))+'<span class="delta"></span>';
-  set("nemp", c.nemp, r.nemp, true, n1);
+  set("nemp", c.nemp, r.nemp, true, n1, true);
   set("total", c.total, r.total, true);
   set("sueldos", c.sueldos, r.sueldos, true);
   set("segsoc", c.segsoc, r.segsoc, true);
   set("uniformes", c.uniformes, r.uniformes, true);
   // Total FTE mensual (Σ FTE de los puestos) frente al total FTE de la referencia.
-  set("ftetot", c.nemp, r.nemp, true, n1);
+  set("ftetot", c.nemp, r.nemp, true, n1, true);
   // Total Coste Forecast: coste del forecast (fijo, no cambia al editar/borrar) vs 2025.
   // Sus diferencias llevan la clase .dfc para que el botón de cabecera las oculte solo a ellas.
   const fcE = escenario("fteFc","sueldoFc", false), prevE = escenario("ftePrev","sueldoPrev", false);
@@ -299,14 +301,14 @@ function writePuestos(){
     const refFte = RB()==="prev"?p.ftePrev:p.fteFc;
     const celdasFte = M.map((_,i)=>`<td class="num mes fte"><input class="c" data-pi="${pi}" data-m="${i}" value="${p.fte[i]?n1(p.fte[i]):''}"><span class="ref">${refFte[i]?n1(refFte[i]):''}</span></td>`).join("");
     return `<tr><td class="lbl"><span class="del" data-del="${pi}">×</span><input class="c" style="width:150px;text-align:left" data-nom="${pi}" value="${p.nombre.replace(/"/g,'&quot;')}"></td>`
-      + celdasFte + `<td class="num tot totfte" id="ptot-${pi}">${sum(p.fte)?n1(sum(p.fte)):''}</td>`
+      + celdasFte + `<td class="num tot totfte" id="ptot-${pi}">${sum(p.fte)?n1(sum(p.fte)/12):''}</td>`
       + `<td class="num tot"><input class="c" data-sue="${pi}" value="${p.sueldo?n0(p.sueldo):''}"></td></tr>`;
   }).join("");
   enlazarPuestos();
 }
 function enlazarPuestos(){
   document.querySelectorAll('input.c[data-pi]').forEach(inp=>inp.addEventListener("input",()=>{ const pi=inp.dataset.pi; P.puestos[pi].fte[+inp.dataset.m]=parse(inp.value)||0;
-    const tot=$("ptot-"+pi); if(tot) tot.textContent = sum(P.puestos[pi].fte)?n1(sum(P.puestos[pi].fte)):''; recomputeSoloResumen(); guardarPers(); }));
+    const tot=$("ptot-"+pi); if(tot) tot.textContent = sum(P.puestos[pi].fte)?n1(sum(P.puestos[pi].fte)/12):''; recomputeSoloResumen(); guardarPers(); }));
   document.querySelectorAll('input.c[data-sue]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.sue].sueldo=parse(inp.value)||0; recomputeSoloResumen(); guardarPers(); }));
   document.querySelectorAll('input.c[data-nom]').forEach(inp=>inp.addEventListener("input",()=>{ P.puestos[inp.dataset.nom].nombre=inp.value; guardarPers(); }));
   document.querySelectorAll('.del').forEach(x=>x.addEventListener("click",()=>{ P.puestos.splice(+x.dataset.del,1); recompute(); guardarPers(); }));
@@ -415,27 +417,29 @@ function _tablaPersonal(cur, ref, prev, puestos){
   const cel=(v,r,fmt)=>{ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`;
     if(r!=null){ const dv=v-r, p=Math.abs(r)>0.5?dv/Math.abs(r)*100:0; const cls=dv<0?'up':'down';
       h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } else h+='<span class="delta"></span>'; return h; };
-  const fila=(cls,label,serie,refserie,fmt)=> `<tr class="${cls}"><td class="lbl">${label}</td>`
-    + serie.map((v,i)=>`<td class="num mes">${cel(v, refserie?refserie[i]:null, fmt)}</td>`).join("")
-    + `<td class="num tot">${cel(sum(serie), refserie?sum(refserie):null, fmt)}</td></tr>`;
+  // avgTot: el total del año es el PROMEDIO de los 12 meses (FTE), no el sumatorio.
+  const fila=(cls,label,serie,refserie,fmt,avgTot)=>{ const tv=avgTot?sum(serie)/12:sum(serie), rv=refserie?(avgTot?sum(refserie)/12:sum(refserie)):null;
+    return `<tr class="${cls}"><td class="lbl">${label}</td>`
+      + serie.map((v,i)=>`<td class="num mes">${cel(v, refserie?refserie[i]:null, fmt)}</td>`).join("")
+      + `<td class="num tot">${cel(tv, rv, fmt)}</td></tr>`; };
   const c=cur, r=ref;
   let b = fila('plant','Plantilla permanente', c.plant, r.plant)
     + fila('','Absentismo', c.abs, null) + fila('','Vacaciones', c.vac, null) + fila('','Eventos', c.eve, null)
     + fila('','Uniformidad', c.unif, null)
-    + fila('','Nº empleados (FTE)', c.nemp, r.nemp, n1)
+    + fila('','Nº empleados (FTE)', c.nemp, r.nemp, n1, true)
     + fila('total','TOTAL COSTE', c.total, r.total)
     + fila('totalfc','TOTAL COSTE FORECAST', r.total, prev.total)
-    + `<tr class="rep"><td class="lbl" colspan="99">Reparto a USALI</td></tr>`
+    + `<tr class="rep"><td class="lbl" colspan="14">Reparto a USALI</td></tr>`
     + fila('rep','Sueldos y salarios (70%)', c.sueldos, r.sueldos)
     + fila('rep','Seguros Sociales (30%)', c.segsoc, r.segsoc)
     + fila('rep','Uniformes', c.uniformes, r.uniformes)
-    + fila('totalfte','Total FTE', c.nemp, r.nemp, n1);
+    + fila('totalfte','Total FTE', c.nemp, r.nemp, n1, true);
   // Apartado de puestos (FTE por mes, Total FTE y sueldo €/FTE) igual que en la ventana; solo en hojas de hotel.
   if(puestos && puestos.length){
     const esc=s=>String(s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
     b += `<tr class="espacio"><td class="lbl"></td>${M.map(()=>'<td></td>').join("")}<td></td><td></td></tr>`;   // línea en blanco
     b += `<tr class="rep"><td class="lbl">Puestos · FTE por mes</td>${M.map(m=>`<td class="num mes">${m}</td>`).join("")}<td class="num tot">Total FTE</td><td class="num tot">Sueldo €/FTE</td></tr>`;
-    b += puestos.map(p=>{ const tot=p.fte.reduce((a,v)=>a+(v||0),0);
+    b += puestos.map(p=>{ const tot=p.fte.reduce((a,v)=>a+(v||0),0)/12;   // promedio anual de FTE
       return `<tr><td class="lbl">${esc(p.nombre)}</td>`
         + p.fte.map(v=>`<td class="num mes">${v?n1(v):''}</td>`).join("")
         + `<td class="num tot">${tot?n1(tot):''}</td>`
