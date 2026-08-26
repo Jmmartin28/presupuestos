@@ -86,6 +86,8 @@
   td.mform, th.mform { background:var(--mform-bg); }
   .mR,.mF,.mP { display:none; }
   table.vR .mR, table.vF .mF, table.vP .mP { display:table-cell; }
+  /* Al desplegar los meses del Ppto, separa visualmente el Fcast (columna anual) de enero (ENE). */
+  table.vP td.mP0, table.vP th.mP0 { border-left:2px solid var(--muted); }
   .delta { display:inline-block; width:104px; text-align:left; margin-left:6px; font-size:9.5px; white-space:nowrap; }
   .delta:empty { display:none; }
   .delta.dfc { display:none; }               /* dif. Forecast vs año anterior: oculta por defecto */
@@ -444,8 +446,8 @@ function escCols(pfx, L){ return M.map((_,i)=>`<td class="num m${L}" id="${pfx}-
   + `<td class="num a${L}" id="${pfx}-t"></td>`; }
 function pptoCols(pfx, editable){
   const meses = M.map((_,i)=> editable
-    ? `<td class="mP"><input class="mp" id="${pfx}-${i}" data-p="${pfx}" data-m="${i}"></td>`
-    : `<td class="num mP" id="${pfx}-${i}"></td>`).join("");
+    ? `<td class="mP${i===0?' mP0':''}"><input class="mp" id="${pfx}-${i}" data-p="${pfx}" data-m="${i}"></td>`
+    : `<td class="num mP${i===0?' mP0':''}" id="${pfx}-${i}"></td>`).join("");
   return meses + `<td class="num aP" id="${pfx}-t"></td>`;
 }
 const MCLS = ["mfijo","mratio","mpct","mform"];
@@ -462,7 +464,7 @@ function margen(cls,p,label){ return `<tr class="${cls}"><td class="lbl">${label
   + escCols(p+"-R","R") + escCols(p+"-F","F") + pptoCols(p+"-P",false)
   + celdasVacias() + `</tr>`; }
 
-const H = (L)=> M.map(m=>`<th class="num m${L}">${m}</th>`).join("");
+const H = (L)=> M.map((m,i)=>`<th class="num m${L}${L==="P"&&i===0?" mP0":""}">${m}</th>`).join("");
 $("cab").innerHTML = '<th class="lbl">Concepto</th>'
   + H("R")+`<th class="num aR esc"><span class="cx" data-v="vR">▸</span>Real 2025</th>`
   + H("F")+`<th class="num aF esc"><span class="cx" data-v="vF">▸</span>Fcast 2026</th>`

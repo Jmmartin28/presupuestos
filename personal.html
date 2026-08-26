@@ -52,7 +52,9 @@
      vacío del mismo ancho para alinear todos los importes. El botón oculta la columna de
      diferencias (con .sin-dif se colapsan los huecos y quedan los importes limpios). */
   .delta { display:inline-block; width:104px; text-align:left; margin-left:6px; font-size:9.5px; white-space:nowrap; }
-  #tR.sin-dif .delta { display:none; }
+  /* El botón oculta SOLO la diferencia de la línea "Total Coste Forecast" (clase dfc); el resto
+     siempre se muestran. Se usa visibility para conservar el hueco y mantener la alineación. */
+  #tR.sin-fc .delta.dfc { visibility:hidden; }
   .delta.up { color:var(--ing); } .delta.down { color:var(--neg); }
   input.c { width:52px; font:inherit; font-size:11.5px; text-align:right; padding:2px 4px;
     border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
@@ -130,7 +132,7 @@
       <div class="ctl"><label>% Vacaciones</label><input type="number" id="pVac" step="0.5"></div>
       <div class="ctl"><label>% Eventos</label><input type="number" id="pEve" step="0.5"></div>
       <button class="btn" id="compR">Comprimir meses</button>
-      <button class="btn on" id="btnDif" title="Muestra u oculta las diferencias y % (Forecast)">Ocultar diferencias</button>
+      <button class="btn on" id="btnDif" title="Muestra u oculta las diferencias y % de la línea Total Coste Forecast">Ocultar dif. Forecast</button>
       <button class="btn" id="btnExcel" title="Exporta un Excel con una pestaña por hotel y una de agregado">Exportar a Excel</button>
       <span id="savedHint" style="font-size:11.5px;color:var(--res);align-self:center;transition:opacity .4s;"></span>
       <div class="ctl" style="margin-left:auto"><label>Referencia de FTE</label><select id="refBase"><option value="fc">Forecast 2026</option><option value="prev">Año anterior</option></select></div>
@@ -255,8 +257,12 @@ function writeResumen(c, r){
   // Total FTE mensual (Σ FTE de los puestos) frente al total FTE de la referencia.
   set("ftetot", c.nemp, r.nemp, true, n1);
   // Total Coste Forecast: coste del forecast (fijo, no cambia al editar/borrar) vs 2025.
+  // Sus diferencias llevan la clase .dfc para que el botón de cabecera las oculte solo a ellas.
   const fcE = escenario("fteFc","sueldoFc", false), prevE = escenario("ftePrev","sueldoPrev", false);
-  set("totalfc", fcE.total, prevE.total, true);
+  const setFc = (id, serie, refserie)=>{
+    serie.forEach((v,i)=>{ const e=$(id+"-"+i); if(e) e.innerHTML=celD(v,refserie[i],n0).replace(/class="delta/g,'class="delta dfc'); });
+    const t=$(id+"-t"); if(t) t.innerHTML=celD(sum(serie),sum(refserie),n0).replace(/class="delta/g,'class="delta dfc'); };
+  setFc("totalfc", fcE.total, prevE.total);
 }
 
 // ---- Construcción tabla resumen ----
@@ -316,8 +322,8 @@ $("compR").addEventListener("click",()=>{ const s1=$("tR").classList.toggle("sol
 $("addPuesto").addEventListener("click",()=>{ P.puestos.push({nombre:"Nuevo puesto",fte:Z(),sueldo:0,fteFc:Z(),sueldoFc:0,ftePrev:Z(),sueldoPrev:0}); recompute(); guardarPers(); });
 $("borrarFte").addEventListener("click",()=>{ P.puestos.forEach(p=>p.fte=Z()); recompute(); guardarPers(); });
 // Restaura los puestos y FTE iniciales del forecast (descarta ediciones/copias).
-$("btnDif").addEventListener("click",()=>{ const off=document.getElementById("tR").classList.toggle("sin-dif");
-  $("btnDif").classList.toggle("on", !off); $("btnDif").textContent = off ? "Ver diferencias" : "Ocultar diferencias"; });
+$("btnDif").addEventListener("click",()=>{ const off=document.getElementById("tR").classList.toggle("sin-fc");
+  $("btnDif").classList.toggle("on", !off); $("btnDif").textContent = off ? "Ver dif. Forecast" : "Ocultar dif. Forecast"; });
 $("restaurarFc").addEventListener("click",()=>{
   if(!confirm("¿Volver a los puestos y FTE iniciales del forecast?\n\nSe descartan las ediciones y copias de este hotel.")) return;
   P.puestos = PUESTOS_FC.map(p => ({ nombre:p.nombre, fte:p.fteFc.slice(), sueldo:p.sueldoFc,
@@ -367,14 +373,14 @@ recompute();
 // Escenarios (cur = ppto con ediciones de la versión; ref = forecast; prev = año anterior) de un hotel.
 function _seriesPersonal(id){
   const P0=(D.porHotel[id]||{}).personal; if(!P0) return null;
-  let puestos=(P0.puestos||[]).map(p=>({ fte:(p.fteFc||[]).slice(), sueldo:p.sueldoFc||0, fteFc:(p.fteFc||[]).slice(), sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
+  let puestos=(P0.puestos||[]).map(p=>({ nombre:p.nombre||'', fte:(p.fteFc||[]).slice(), sueldo:p.sueldoFc||0, fteFc:(p.fteFc||[]).slice(), sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
   let pAbs=P0.pct.absentismo, pVac=P0.pct.vacaciones, pEve=P0.pct.eventos;
   let man={abs:Z().map(()=>null),vac:Z().map(()=>null),eve:Z().map(()=>null)};
   let unifCur=(P0.unifFc||[]).slice(), unifFc=(P0.unifFc||[]).slice(), unifPrev=(P0.unifPrev||[]).slice();
   const a=_activeVer();
   if(a){ const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); const s=vs[a]&&vs[a].personal&&vs[a].personal[id];
     if(s){
-      if(Array.isArray(s.puestos)) puestos=s.puestos.map(p=>({ fte:(p.fte||p.fteFc||[]).slice(), sueldo:(p.sueldo!=null?p.sueldo:p.sueldoFc)||0, fteFc:(p.fteFc||[]).slice(), sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
+      if(Array.isArray(s.puestos)) puestos=s.puestos.map(p=>({ nombre:p.nombre||'', fte:(p.fte||p.fteFc||[]).slice(), sueldo:(p.sueldo!=null?p.sueldo:p.sueldoFc)||0, fteFc:(p.fteFc||[]).slice(), sueldoFc:p.sueldoFc||0, ftePrev:(p.ftePrev||[]).slice(), sueldoPrev:p.sueldoPrev||0 }));
       if(s.pAbs!=null) pAbs=(parseFloat(s.pAbs)||0)/100; if(s.pVac!=null) pVac=(parseFloat(s.pVac)||0)/100; if(s.pEve!=null) pEve=(parseFloat(s.pEve)||0)/100;
       if(s.manual){ ["abs","vac","eve"].forEach(k=>{ if(Array.isArray(s.manual[k])) s.manual[k].forEach((v,i)=> man[k][i]=v); }); }
       if(Array.isArray(s.unif)) unifCur=s.unif.slice();
@@ -388,11 +394,12 @@ function _seriesPersonal(id){
     const base=M.map((_,i)=> plant[i]+abs[i]+vac[i]+eve[i]), nemp=M.map((_,i)=> puestos.reduce((acc,p)=> acc+(p[fteKey][i]||0),0));
     return { plant,abs,vac,eve, unif:unif.slice(), nemp, sueldos:base.map(x=>x*0.7), segsoc:base.map(x=>x*0.3), uniformes:unif.slice(), total:M.map((_,i)=> base[i]+unif[i]) };
   }
-  return { cur: esc('fte','sueldo',pAbs,pVac,pEve,true,unifCur),
+  return { puestos: puestos.map(p=>({ nombre:p.nombre, fte:p.fte.slice(), sueldo:p.sueldo })),
+    cur: esc('fte','sueldo',pAbs,pVac,pEve,true,unifCur),
     ref: esc('fteFc','sueldoFc',P0.pct.absentismo,P0.pct.vacaciones,P0.pct.eventos,false,unifFc),
     prev: esc('ftePrev','sueldoPrev',P0.pct.absentismo,P0.pct.vacaciones,P0.pct.eventos,false,unifPrev) };
 }
-function _tablaPersonal(cur, ref, prev){
+function _tablaPersonal(cur, ref, prev, puestos){
   const cel=(v,r,fmt)=>{ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`;
     if(r!=null){ const dv=v-r, p=Math.abs(r)>0.5?dv/Math.abs(r)*100:0; const cls=dv<0?'up':'down';
       h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } else h+='<span class="delta"></span>'; return h; };
@@ -411,6 +418,13 @@ function _tablaPersonal(cur, ref, prev){
     + fila('rep','Seguros Sociales (30%)', c.segsoc, r.segsoc)
     + fila('rep','Uniformes', c.uniformes, r.uniformes)
     + fila('totalfte','Total FTE', c.nemp, r.nemp, n1);
+  // Apartado de puestos (FTE por mes y sueldo €/FTE) igual que en la ventana; solo en hojas de hotel.
+  if(puestos && puestos.length){
+    b += `<tr class="rep"><td class="lbl" colspan="99">Puestos · FTE por mes (columna final: sueldo €/FTE)</td></tr>`;
+    b += puestos.map(p=> `<tr><td class="lbl">${String(p.nombre||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</td>`
+      + p.fte.map(v=>`<td class="num mes">${v?n1(v):''}</td>`).join("")
+      + `<td class="num tot">${p.sueldo?n0(p.sueldo):''}</td></tr>`).join("");
+  }
   const cab='<th class="lbl">Concepto</th>'+M.map(m=>`<th class="num mes">${m}<span class="delta"></span></th>`).join("")+'<th class="num tot">Año<span class="delta"></span></th>';
   const t=document.createElement("table"); t.innerHTML=`<thead><tr>${cab}</tr></thead><tbody>${b}</tbody>`; return t;
 }
@@ -419,7 +433,7 @@ $("btnExcel").addEventListener("click", ()=>{
   const hs=D.hoteles.filter(hotelVisible); if(!hs.length) return;
   const lib=SHG.nuevoLibro();
   const cont=document.createElement("div"); cont.style.cssText="position:absolute;left:-9999px;top:0;"; document.body.appendChild(cont);
-  const push=(nombre,S)=>{ cont.innerHTML=""; const t=_tablaPersonal(S.cur,S.ref,S.prev); cont.appendChild(t); SHG.agregarHoja(lib, nombre, t); };
+  const push=(nombre,S)=>{ cont.innerHTML=""; const t=_tablaPersonal(S.cur,S.ref,S.prev,S.puestos); cont.appendChild(t); SHG.agregarHoja(lib, nombre, t); };
   const SS=hs.map(h=>_seriesPersonal(h.id)).filter(Boolean);
   const KEYS=['plant','abs','vac','eve','unif','nemp','total','sueldos','segsoc','uniformes'];
   const sc=g=>{ const o={}; KEYS.forEach(k=> o[k]=M.map((_,i)=> SS.reduce((a,s)=> a+((s[g][k]||[])[i]||0),0))); return o; };
