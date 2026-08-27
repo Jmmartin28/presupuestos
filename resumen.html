@@ -274,6 +274,7 @@ let ambito = "todas";   // todas | hoteleras | nohoteleras | z<idZona>
 function enAmbito(h){
   if(ambito==="hoteleras") return h.hotelera;
   if(ambito==="nohoteleras") return !h.hotelera;
+  if(ambito.indexOf("g:")===0) return h.grupoAnalisis===ambito.slice(2);   // agrupación transversal
   if(ambito[0]==="z") return String(h.idZona)===ambito.slice(1);
   return true;   // "todas"
 }
@@ -285,8 +286,10 @@ function acumular(cond){
 }
 function pintarAmbito(){
   const zs=(D.zonas||[]).map(z=>`<option value="z${z.id}">${z.nombre}</option>`).join("");
+  const gs=(D.grupos||[]).map(g=>`<option value="g:${g}">${g}</option>`).join("");
   $("ambito").innerHTML = `<option value="todas">Todas</option><option value="hoteleras">Solo hoteleras</option>`
-    + `<option value="nohoteleras">Solo no hoteleras</option>` + zs;
+    + `<option value="nohoteleras">Solo no hoteleras</option>`
+    + (zs?`<optgroup label="Zonas">${zs}</optgroup>`:"") + (gs?`<optgroup label="Agrupaciones">${gs}</optgroup>`:"");
   $("ambito").value = ambito;
   $("ambito").addEventListener("change", ()=>{ ambito = $("ambito").value; render(); });
 }

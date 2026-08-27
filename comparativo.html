@@ -333,6 +333,8 @@ function etiquetaSel(hs){
   if(nohAll.length && hs.length===nohAll.length && nohAll.every(h=>setIds.has(h.id))) return "Total no hoteleras";
   for(const z of (D.zonas||[])){ const zh=HOT.filter(h=>String(h.idZona)===String(z.id));
     if(zh.length && zh.length===hs.length && zh.every(h=>setIds.has(h.id))) return z.nombre; }
+  for(const g of (D.grupos||[])){ const gh=HOT.filter(h=>h.grupoAnalisis===g);
+    if(gh.length && gh.length===hs.length && gh.every(h=>setIds.has(h.id))) return g; }
   if(hs.length===1) return hs[0].nombre;
   return hs.length+" entidades";
 }
@@ -353,9 +355,11 @@ function pintarSel(L){
   const st=lados[L];
   const grupo=(t,cond)=>`<div class="grp">${t}</div>`+HOT.filter(cond).map(h=>`<label><input type="checkbox" data-h="${h.id}" ${st.sel[h.id]?"checked":""}> ${h.nombre}</label>`).join("");
   const zbtns=(D.zonas||[]).map(z=>`<button class="btn" data-z="${z.id}">${z.nombre}</button>`).join("");
+  const gbtns=(D.grupos||[]).map(g=>`<button class="btn" data-g="${g}">${g}</button>`).join("");
   const panel=$("sel"+L);
   panel.innerHTML=`<div class="dd-actions"><button class="btn" data-a="todos">Total agregado</button><button class="btn" data-a="hot">Hoteleras</button><button class="btn" data-a="noh">No hoteleras</button><button class="btn" data-a="ninguno">Ninguno</button></div>`
     + (zbtns ? `<div class="dd-actions">${zbtns}</div>` : "")
+    + (gbtns ? `<div class="dd-actions">${gbtns}</div>` : "")
     + grupo("Sociedades no hoteleras", h=>!h.hotelera) + grupo("Sociedades hoteleras", h=>h.hotelera);
   panel.querySelectorAll('input').forEach(c=>c.addEventListener("change",()=>{ st.sel[c.dataset.h]=c.checked; actualizarBtn(L); render(); }));
   panel.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener("click",()=>{
@@ -364,6 +368,9 @@ function pintarSel(L){
     pintarSel(L); actualizarBtn(L); render(); }));
   panel.querySelectorAll('button[data-z]').forEach(b=>b.addEventListener("click",()=>{
     HOT.forEach(h=> st.sel[h.id]= String(h.idZona)===b.dataset.z);
+    pintarSel(L); actualizarBtn(L); render(); }));
+  panel.querySelectorAll('button[data-g]').forEach(b=>b.addEventListener("click",()=>{
+    HOT.forEach(h=> st.sel[h.id]= h.grupoAnalisis===b.dataset.g);
     pintarSel(L); actualizarBtn(L); render(); }));
 }
 function actualizarBtn(L){ const n=HOT.filter(h=>lados[L].sel[h.id]).length; $("ddBtn"+L).textContent=`${etiquetaSel(HOT.filter(h=>lados[L].sel[h.id]))} (${n}) ▾`; }

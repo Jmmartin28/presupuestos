@@ -286,9 +286,11 @@ const tint = c => c.cons ? c.b.replace("b","tc") : "tch";
 function pintarSel(){
   const grupo=(t,cond)=>`<div class="grp">${t}</div>`+HOT.filter(cond).map(h=>`<label><input type="checkbox" data-h="${h.id}" ${sel[h.id]?"checked":""}> ${h.nombre}</label>`).join("");
   const zbtns=(D.zonas||[]).map(z=>`<button class="btn" data-z="${z.id}">${z.nombre}</button>`).join("");
+  const gbtns=(D.grupos||[]).map(g=>`<button class="btn" data-g="${g}">${g}</button>`).join("");
   $("sel").innerHTML=`<div class="dd-actions"><button class="btn" data-a="todos">Todos</button><button class="btn" data-a="ninguno">Ninguno</button>`
     + `<button class="btn" data-a="hot">Solo hoteleras</button><button class="btn" data-a="noh">Solo no hoteleras</button></div>`
     + (zbtns ? `<div class="dd-actions">${zbtns}</div>` : "")
+    + (gbtns ? `<div class="dd-actions">${gbtns}</div>` : "")
     + grupo("Sociedades no hoteleras", h=>!h.hotelera) + grupo("Sociedades hoteleras", h=>h.hotelera);
   $("sel").querySelectorAll('input').forEach(c=>c.addEventListener("change",()=>{ sel[c.dataset.h]=c.checked; actualizarBtn(); render(); }));
   $("sel").querySelectorAll('button[data-a]').forEach(b=>b.addEventListener("click",()=>{
@@ -297,6 +299,9 @@ function pintarSel(){
     pintarSel(); actualizarBtn(); render(); }));
   $("sel").querySelectorAll('button[data-z]').forEach(b=>b.addEventListener("click",()=>{
     HOT.forEach(h=> sel[h.id]= String(h.idZona)===b.dataset.z);   // selecciona solo esa zona
+    pintarSel(); actualizarBtn(); render(); }));
+  $("sel").querySelectorAll('button[data-g]').forEach(b=>b.addEventListener("click",()=>{
+    HOT.forEach(h=> sel[h.id]= h.grupoAnalisis===b.dataset.g);    // selecciona solo esa agrupación
     pintarSel(); actualizarBtn(); render(); }));
 }
 function actualizarBtn(){ $("ddBtn").textContent=`Hoteles (${HOT.filter(h=>sel[h.id]).length}/${HOT.length}) ▾`; }
