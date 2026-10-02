@@ -160,6 +160,7 @@
   // Descarga las dos listas y reconstruye el objeto shg_versiones en localStorage.
   async function cargarTodo() {
     var colsV = await getCols(C.listaVersiones), fAnio = interno(colsV, "Año");
+    var tieneVis = ("Visible_Para" in colsV), fVis = colsV["Visible_Para"];   // visibilidad por versión
     var vers = await leerItems(C.listaVersiones);
     var hots = await leerItems(C.listaHoteles);
     _idByTitle[C.listaVersiones] = {}; _idByTitle[C.listaHoteles] = {};
@@ -175,7 +176,15 @@
         hipotesis: f.Hipotesis || "", incrementos: _parse(f.IncrementosJSON), hoteles: hlist, mesAuditado: mAud, centralMf: cMf,
         consolidacion: cons, overrides: {}, medidas: {}, alojamiento: {}, personal: {}, pptoCat: {},
         creada: f.Creada || "", modificada: f.Modificada || "" };
+      out[id]._vis = tieneVis ? _partes(f[fVis]).map(function (s) { return s.toLowerCase(); }) : [];
     });
+    // Visibilidad de versiones: si el usuario no ve todas, oculta las que no le incluyan en
+    // Visible_Para (filtro de la app, nivel UX; la gestión se hace en SharePoint).
+    if (tieneVis && _sesion && !_sesion.veTodas) {
+      var _em = _sesion.email || "";
+      Object.keys(out).forEach(function (id) { if (out[id]._vis.indexOf(_em) < 0) delete out[id]; });
+    }
+    Object.keys(out).forEach(function (id) { delete out[id]._vis; });
     hots.forEach(function (it) {
       var f = it.fields || {}, t = f.Title; if (!t) return;
       _idByTitle[C.listaHoteles][t] = it.id;
@@ -226,6 +235,9 @@
       if ("CentralMfJSON" in cols) fields.CentralMfJSON = JSON.stringify(reg.centralMf || null);   // override MF Central
       if ("ConsolidacionJSON" in cols) fields.ConsolidacionJSON = JSON.stringify(reg.consolidacion || null);   // reglas de consolidación activas/inactivas
       var id = _idByTitle[C.listaVersiones] && _idByTitle[C.listaVersiones][versionId];
+      // Al CREAR, incluye al creador en Visible_Para (así ve su propia versión). Al actualizar
+      // no se toca, para respetar la visibilidad que el administrador gestione en SharePoint.
+      if (!id && ("Visible_Para" in cols)) fields[cols["Visible_Para"]] = _emailCuenta();
       if (id) await actualizarItem(C.listaVersiones, id, fields);
       else { var c = await crearItem(C.listaVersiones, fields); _idByTitle[C.listaVersiones][versionId] = c.id; }
       _estado("guardado ✓ " + new Date().toLocaleTimeString(), "ok");
@@ -389,6 +401,7 @@
     } catch (e) { console.error("No se pudo leer la lista de usuarios:", e); }
     if (!fila) { _sesion = { email: email, autorizado: false }; return _sesion; }
     var pag = String(fila.Paginas || "todas").toLowerCase();
+    var vt = fila.VeTodasVersiones;   // vacío/ausente = ve todas; "No" = solo las asignadas
     _sesion = {
       email: email,
       nombre: fila.Nombre || email,
@@ -397,6 +410,7 @@
       zonas: _partes(fila.Zonas).map(function (z) { return z.toLowerCase(); }),
       hoteles: _partes(fila.Hoteles).map(Number).filter(function (n) { return !isNaN(n); }),
       paginas: pag.indexOf("todas") >= 0 ? PAGINAS_TODAS : _partes(pag),
+      veTodas: (vt === undefined || vt === null || String(vt).trim() === "") ? true : _esVerdadero(vt),
     };
     return _sesion;
   }
