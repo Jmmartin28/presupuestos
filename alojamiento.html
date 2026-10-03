@@ -8,9 +8,10 @@
   :root {
     --bg:#f6f7f9; --panel:#fff; --ink:#1a2230; --muted:#6b7688; --line:#e6e9ef;
     --ing:#157347; --ing-bg:#e8f3ec; --inp:#0f766e; --inp-bg:#e5f1ef; --neg:#c0392b;
-    /* Un color por fila editable (Días / Ocupación nº / Ocupación % / ADR). */
+    /* Un color por fila editable (Días / Habitaciones / Ocupación nº / Ocupación % / ADR). */
     --r-dias:#e8f0fb; --r-dias-ink:#2f6db0; --r-ocu:#fbe9e8; --r-ocu-ink:#c0392b;
     --r-pct:#f1e9fb; --r-pct-ink:#7c4dbf; --r-adr:#f7efe1; --r-adr-ink:#b9722a;
+    --r-hab:#e2f3f6; --r-hab-ink:#1f7f93;
     --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -19,6 +20,7 @@
       --ing:#4ac07e; --ing-bg:#15301f; --inp:#4fd1c5; --inp-bg:#14312e; --neg:#ff6b5e;
       --r-dias:#16283c; --r-dias-ink:#7db3e6; --r-ocu:#3a1c1b; --r-ocu-ink:#ff8f84;
       --r-pct:#241a3a; --r-pct-ink:#b79be6; --r-adr:#312819; --r-adr-ink:#e0a566;
+      --r-hab:#12303a; --r-hab-ink:#63c4d8;
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
     }
   }
@@ -63,6 +65,7 @@
   tr.inp td { background:var(--inp-bg); }
   /* Cada fila editable con su propio color para distinguirlas de un vistazo. */
   tr.inp-dias td { background:var(--r-dias); } tr.inp-dias td.lbl { color:var(--r-dias-ink); background:var(--r-dias); }
+  tr.inp-hab  td { background:var(--r-hab);  } tr.inp-hab  td.lbl { color:var(--r-hab-ink);  background:var(--r-hab);  }
   tr.inp-ocu  td { background:var(--r-ocu);  } tr.inp-ocu  td.lbl { color:var(--r-ocu-ink);  background:var(--r-ocu);  }
   tr.inp-pct  td { background:var(--r-pct);  } tr.inp-pct  td.lbl { color:var(--r-pct-ink);  background:var(--r-pct);  }
   tr.inp-adr  td { background:var(--r-adr);  } tr.inp-adr  td.lbl { color:var(--r-adr-ink);  background:var(--r-adr);  }
@@ -264,7 +267,8 @@ function mesCorte(){ try{ const a=localStorage.getItem("shg_version_activa");
 })();
 
 // Estado editable del ejercicio objetivo: arranca desde el año en curso (editable).
-const S = { dias: D.diasDef.slice(), ocu: D.ocu26.slice(), adr: D.adr26.slice() };
+// Habitaciones del año objetivo: arranca del inventario 2027 del maestro, editable por mes.
+const S = { dias: D.diasDef.slice(), hab: M.map(()=> D.hab2027||0), ocu: D.ocu26.slice(), adr: D.adr26.slice() };
 
 // ---- Autoguardado sobre la versión activa ----
 function _activeVer(){ try{ const a=localStorage.getItem("shg_version_activa");
@@ -275,7 +279,7 @@ function guardarAloj(){ const a=_activeVer(), h=$("savedHint");
   clearTimeout(_saveT); _saveT=setTimeout(()=>{ try{
     const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); if(!vs[a]) return;
     vs[a].alojamiento=vs[a].alojamiento||{};
-    vs[a].alojamiento[D.idHotel]={ dias:S.dias, ocu:S.ocu, adr:S.adr,
+    vs[a].alojamiento[D.idHotel]={ dias:S.dias, hab:S.hab, ocu:S.ocu, adr:S.adr,
       incIng:parseFloat($("incIng").value)||0, incOcu:parseFloat($("incOcu").value)||0,
       ventasMes: S.ocu.map((o,i)=> o*S.adr[i]) };   // ingresos publicados para la hoja de trabajo
     vs[a].modificada=new Date().toISOString();
@@ -287,13 +291,14 @@ function guardarAloj(){ const a=_activeVer(), h=$("savedHint");
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}");
   const s=vs[a]&&vs[a].alojamiento&&vs[a].alojamiento[D.idHotel]; if(!s) return;
   if(Array.isArray(s.dias)) S.dias=s.dias.slice();
+  if(Array.isArray(s.hab)) S.hab=s.hab.slice();
   if(Array.isArray(s.ocu)) S.ocu=s.ocu.slice();
   if(Array.isArray(s.adr)) S.adr=s.adr.slice();
   if(s.incIng!=null){ const e=$("incIng"); if(e) e.value=s.incIng; }
   if(s.incOcu!=null){ const e=$("incOcu"); if(e) e.value=s.incOcu; }
 }catch(e){} })();
-const disp = () => S.dias.map(d => d * D.hab);
-const pct = () => S.ocu.map((o,i)=> { const d=S.dias[i]*D.hab; return d? o/d*100:0; });
+const disp = () => S.dias.map((d,i) => d * (S.hab[i]||0));
+const pct = () => S.ocu.map((o,i)=> { const d=S.dias[i]*(S.hab[i]||0); return d? o/d*100:0; });
 const ventas = () => S.ocu.map((o,i)=> o * S.adr[i]);
 const wadr = (v,o)=> sum(o)? sum(v)/sum(o):0;
 const wpct = (o,d)=> sum(d)? sum(o)/sum(d)*100:0;
@@ -328,6 +333,7 @@ $("cuerpo").innerHTML =
   + calc("ventas","v27","Ppto 2027")
   + `<tr class="sec"><td colspan="99">Ocupación y ADR</td></tr>`
   + inp("dias","Días 2027", n0)
+  + inp("hab","Nº habitaciones 2027", n0)
   + calc("","disp27","Disponibilidad 2027")
   + ref("Ocupación nº 2025", D.ocu25, n0, sum(D.ocu25))
   + refD("Ocupación nº 2026", D.ocu26, n0, sum(D.ocu26), D.ocu25, sum(D.ocu25), dFmt(n0))
@@ -343,7 +349,7 @@ function setInput(k, i, txt){
   const el = document.querySelector(`input.c[data-k="${k}"][data-m="${i}"]`);
   if (el && document.activeElement !== el) el.value = txt;
 }
-const dispM = i => S.dias[i] * D.hab;
+const dispM = i => S.dias[i] * (S.hab[i]||0);
 const pctM = i => { const d = dispM(i); return d ? S.ocu[i] / d * 100 : 0; };
 
 function setAmt(id, t){ const e = $(id); if (e) e.textContent = t; }
@@ -382,7 +388,7 @@ document.querySelectorAll("input.c").forEach(el => el.addEventListener("input", 
   const k = el.dataset.k, m = +el.dataset.m, val = parse(el.value);
   if (k === "pct") { S.ocu[m] = val / 100 * dispM(m); setInput("ocu", m, val ? n0(S.ocu[m]) : ""); }
   else if (k === "ocu") { S.ocu[m] = val; setInput("pct", m, val ? n1(pctM(m)) : ""); }
-  else { S[k][m] = val; if (k === "dias" && S.ocu[m]) setInput("pct", m, n1(pctM(m))); }
+  else { S[k][m] = val; if ((k === "dias" || k === "hab") && S.ocu[m]) setInput("pct", m, n1(pctM(m))); }
   recompute(); guardarAloj();
 }));
 
@@ -403,7 +409,7 @@ $("comprimir").addEventListener("click", () => {     // comprime/expande los mes
   $("comprimir").textContent = solo ? "Ver meses" : "Comprimir meses";
   $("comprimir").classList.toggle("on", solo);
 });
-$("limpiar").addEventListener("click", () => {       // vacía todo menos Días
+$("limpiar").addEventListener("click", () => {       // vacía Ocupación y ADR (conserva Días y Habitaciones)
   S.ocu.fill(0); S.adr.fill(0);
   ["ocu","pct","adr"].forEach(k => M.forEach((_,i)=> setInput(k, i, "")));
   recompute(); guardarAloj();
@@ -438,13 +444,13 @@ function _seriesHotel(id){
   const disp26 = (N!==null && H.dispReal26 && H.dispPpto26) ? M.map((_,m)=>Math.round(m<N?H.dispReal26[m]:H.dispPpto26[m])) : (H.disp26||[]).slice();
   const pct26 = M.map((_,m)=> disp26[m]? Math.round(ocu26[m]/disp26[m]*1000)/10:0);
   const adr26 = M.map((_,m)=> ocu26[m]? Math.round(v26[m]/ocu26[m]*100)/100:0);
-  let dias=(H.diasDef||[]).slice(), ocu=ocu26.slice(), adr=adr26.slice();
+  let dias=(H.diasDef||[]).slice(), hab=M.map(()=> H.hab2027||0), ocu=ocu26.slice(), adr=adr26.slice();
   const a=_activeVer();
   if(a){ const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); const s=vs[a]&&vs[a].alojamiento&&vs[a].alojamiento[id];
-    if(s){ if(Array.isArray(s.dias))dias=s.dias.slice(); if(Array.isArray(s.ocu))ocu=s.ocu.slice(); if(Array.isArray(s.adr))adr=s.adr.slice(); } }
-  const disp27=dias.map(d=> d*H.hab), pct27=ocu.map((o,i)=> disp27[i]? o/disp27[i]*100:0), v27=ocu.map((o,i)=> o*adr[i]);
+    if(s){ if(Array.isArray(s.dias))dias=s.dias.slice(); if(Array.isArray(s.hab))hab=s.hab.slice(); if(Array.isArray(s.ocu))ocu=s.ocu.slice(); if(Array.isArray(s.adr))adr=s.adr.slice(); } }
+  const disp27=dias.map((d,i)=> d*(hab[i]||0)), pct27=ocu.map((o,i)=> disp27[i]? o/disp27[i]*100:0), v27=ocu.map((o,i)=> o*adr[i]);
   return { v25:H.v25, v26, v27, ocu25:H.ocu25, ocu26, ocu27:ocu, disp25:H.disp25, disp26, disp27,
-    pct25:H.pct25, pct26, pct27, adr25:H.adr25, adr26, adr27:adr, dias27:dias };
+    pct25:H.pct25, pct26, pct27, adr25:H.adr25, adr26, adr27:adr, dias27:dias, hab27:hab };
 }
 function _aggSeries(hs){
   const S=hs.map(h=>_seriesHotel(h.id)).filter(Boolean), Z=()=>M.map(()=>0);
@@ -453,7 +459,7 @@ function _aggSeries(hs){
     disp25=suma('disp25'),disp26=suma('disp26'),disp27=suma('disp27');
   const pc=(o,d)=>M.map((_,i)=> d[i]? o[i]/d[i]*100:0), ad=(v,o)=>M.map((_,i)=> o[i]? v[i]/o[i]:0);
   return { v25,v26,v27, ocu25,ocu26,ocu27, disp25,disp26,disp27, pct25:pc(ocu25,disp25),pct26:pc(ocu26,disp26),pct27:pc(ocu27,disp27),
-    adr25:ad(v25,ocu25),adr26:ad(v26,ocu26),adr27:ad(v27,ocu27), dias27:Z() };
+    adr25:ad(v25,ocu25),adr26:ad(v26,ocu26),adr27:ad(v27,ocu27), dias27:Z(), hab27:Z() };
 }
 function _tablaHotel(s){
   const wp=(o,d)=>sum(d)?sum(o)/sum(d)*100:0, wa=(v,o)=>sum(o)?sum(v)/sum(o):0;
@@ -466,6 +472,7 @@ function _tablaHotel(s){
     + fila('calc ventas','Ppto 2027', s.v27, n0, sum(s.v27), s.v26, sum(s.v26), dImpPct)
     + `<tr class="sec"><td colspan="99">Ocupación y ADR</td></tr>`
     + fila('inp inp-dias','Días 2027', s.dias27, n0, sum(s.dias27))
+    + fila('inp inp-hab','Nº habitaciones 2027', s.hab27, n0, sum(s.hab27))
     + fila('calc','Disponibilidad 2027', s.disp27, n0, sum(s.disp27))
     + fila('ref','Ocupación nº 2025', s.ocu25, n0, sum(s.ocu25))
     + fila('ref','Ocupación nº 2026', s.ocu26, n0, sum(s.ocu26), s.ocu25, sum(s.ocu25), dFmt(n0))
