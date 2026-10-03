@@ -82,7 +82,7 @@
 </style>
 </head>
 <body>
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=17"></script><script src="shg-cloud.js?v=17"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("alojamiento");</script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script><script src="config.js?v=18"></script><script src="shg-cloud.js?v=18"></script><script>window.SHG && SHG.autoSync && SHG.autoSync("alojamiento");</script>
 <style>
   .appbar { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:10px 14px;
     flex-wrap:wrap; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line);
@@ -444,7 +444,7 @@ function _seriesHotel(id){
   const disp26 = (N!==null && H.dispReal26 && H.dispPpto26) ? M.map((_,m)=>Math.round(m<N?H.dispReal26[m]:H.dispPpto26[m])) : (H.disp26||[]).slice();
   const pct26 = M.map((_,m)=> disp26[m]? Math.round(ocu26[m]/disp26[m]*1000)/10:0);
   const adr26 = M.map((_,m)=> ocu26[m]? Math.round(v26[m]/ocu26[m]*100)/100:0);
-  let dias=(H.diasDef||[]).slice(), hab=M.map(()=> H.hab2027||0), ocu=ocu26.slice(), adr=adr26.slice();
+  let dias=(D.diasDef||[]).slice(), hab=M.map(()=> H.hab2027||0), ocu=ocu26.slice(), adr=adr26.slice();
   const a=_activeVer();
   if(a){ const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); const s=vs[a]&&vs[a].alojamiento&&vs[a].alojamiento[id];
     if(s){ if(Array.isArray(s.dias))dias=s.dias.slice(); if(Array.isArray(s.hab))hab=s.hab.slice(); if(Array.isArray(s.ocu))ocu=s.ocu.slice(); if(Array.isArray(s.adr))adr=s.adr.slice(); } }
@@ -455,11 +455,12 @@ function _seriesHotel(id){
 function _aggSeries(hs){
   const S=hs.map(h=>_seriesHotel(h.id)).filter(Boolean), Z=()=>M.map(()=>0);
   const suma=k=> S.reduce((a,x)=> a.map((v,i)=>v+(x[k][i]||0)), Z());
+  const n=S.length||1, media=k=> suma(k).map(v=> v/n);   // días = media de los hoteles (mismos días del mes)
   const v25=suma('v25'),v26=suma('v26'),v27=suma('v27'),ocu25=suma('ocu25'),ocu26=suma('ocu26'),ocu27=suma('ocu27'),
     disp25=suma('disp25'),disp26=suma('disp26'),disp27=suma('disp27');
   const pc=(o,d)=>M.map((_,i)=> d[i]? o[i]/d[i]*100:0), ad=(v,o)=>M.map((_,i)=> o[i]? v[i]/o[i]:0);
   return { v25,v26,v27, ocu25,ocu26,ocu27, disp25,disp26,disp27, pct25:pc(ocu25,disp25),pct26:pc(ocu26,disp26),pct27:pc(ocu27,disp27),
-    adr25:ad(v25,ocu25),adr26:ad(v26,ocu26),adr27:ad(v27,ocu27), dias27:Z(), hab27:Z() };
+    adr25:ad(v25,ocu25),adr26:ad(v26,ocu26),adr27:ad(v27,ocu27), dias27:media('dias27'), hab27:suma('hab27') };
 }
 function _tablaHotel(s){
   const wp=(o,d)=>sum(d)?sum(o)/sum(d)*100:0, wa=(v,o)=>sum(o)?sum(v)/sum(o):0;

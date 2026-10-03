@@ -589,6 +589,9 @@
         var s = xfId(fontId(col, bold || esCab), fillId(bg), (p.num != null ? numId(p.fmt) : 0), align);
         if (p.num != null) xml += '<c r="' + ref + '" s="' + s + '"><v>' + p.num + "</v></c>";
         else xml += '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t>' + _xmlesc(txt) + "</t></is></c>";
+        // Celdas vacías (mismo estilo/borde) para las columnas de una combinación horizontal:
+        // sin ellas, Excel solo dibuja el borde inferior bajo la primera columna del merge.
+        for (var sc = 1; sc < span; sc++) xml += '<c r="' + _colName(ci + sc) + nf + '" s="' + s + '"/>';
         if (span > 1 || rspan > 1) merges.push(ref + ":" + _colName(ci + span - 1) + (nf + rspan - 1));   // combinadas
         if (rspan > 1) for (var j = 0; j < span; j++) pend[ci + j] = rspan;
         if (cel.classList.contains("mes")) for (var k = 0; k < span; k++) mesCols[ci + k] = 1;
