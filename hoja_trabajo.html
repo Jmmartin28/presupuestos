@@ -281,10 +281,17 @@ const parse = s => { const v = parseFloat(String(s).replace(/\./g,"").replace(",
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim();
 const RB = () => $("refBase").value;   // "fc" | "prev"
 
-// Estado por partida
+// Estado por partida. El reparto (share) de las ventas de página (Alojamiento) entre las
+// líneas del grupo va por peso del año anterior; si el grupo no tiene histórico (hotel nuevo,
+// aparthotel…), se reparte por forecast, y si tampoco hay, a partes iguales. Antes, sin
+// histórico todos los share salían 0 y la venta cargada se anulaba.
 D.grupos.forEach(g => {
-  const gp = g.detalle.reduce((a,d)=>a+d.prev,0) || 1;
-  g.detalle.forEach(d => { d.fijo=d.ratio=d.pct=null; d.formula=""; d.manual=new Array(12).fill(null); d.share=d.prev/gp; });
+  const n = g.detalle.length || 1;
+  const fcTot = d => (d.fcMes||[]).reduce((a,v)=>a+(v||0),0);
+  const gpPrev = g.detalle.reduce((a,d)=>a+(d.prev||0),0);
+  const gpFc = g.detalle.reduce((a,d)=>a+fcTot(d),0);
+  g.detalle.forEach(d => { d.fijo=d.ratio=d.pct=null; d.formula=""; d.manual=new Array(12).fill(null);
+    d.share = gpPrev ? (d.prev||0)/gpPrev : (gpFc ? fcTot(d)/gpFc : 1/n); });
 });
 
 // Mes de corte (auditoría) de la versión: null = automático por hotel (forecast horneado);
