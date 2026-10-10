@@ -229,6 +229,15 @@ const CAT_POR_NODO = {};
   (D.catNodos||[]).forEach(c=> subarbol(c.nodo).forEach(n=>{
     if(c.clave==="otros_no_op" && arrSet.has(n)) return; CAT_POR_NODO[n]=c.clave; }));
 })();
+// Nº de nodos hoja por categoría: para repartir a partes iguales cuando no hay forecast.
+const CAT_HOJAS = {};
+Object.keys(CAT_POR_NODO).forEach(id=>{ if(!(HIJOS[id] && HIJOS[id].length)){
+  const c=CAT_POR_NODO[id]; CAT_HOJAS[c]=(CAT_HOJAS[c]||0)+1; } });
+// Signo crudo por categoría (ingreso = -1): para colocar el Ppto de categorías que el hotel
+// no tiene en su forecast (sin ningún nodo) directamente en el total.
+const CAT_SIGN = {};
+(D.catNodos||[]).forEach(c=>{ const hojas=subarbol(c.nodo).filter(n=>!(HIJOS[n]&&HIJOS[n].length));
+  CAT_SIGN[c.clave] = hojas.some(n=>ING.has(+n)) ? -1 : 1; });
 
 // Mes de corte (auditoría) de la versión: null = automático por hotel (forecast horneado);
 // número 0-12 = corte uniforme (real hasta ese mes incluido, presupuesto después).
@@ -275,17 +284,35 @@ function _serieRaw(h, key, ids){
   const pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto por categoría publicado por la hoja
   const fcc = esPpto ? fcCatDe(h) : null;
   ids.forEach(id=>{ const s = src[id]; if(!s) return; const cat = CAT_POR_NODO[id];
+    const sg = ING.has(+id) ? -1 : 1;
+    let annNode=null, annCat=null;   // pesos anuales (lazy), para meses sin forecast
     for(let m=0;m<12;m++){
-      let f = 1;
       if(esPpto){
-        // Reparto del Ppto publicado (proporcional al forecast) por categoría; si no hay,
-        // forecast con el incremento de la versión.
-        if(pc && cat && Array.isArray(pc[cat]) && fcc[cat] && fcc[cat][m]) f = pc[cat][m]/fcc[cat][m];
-        else f = 1 + incFrac(cat, h.id);
-      }
-      acc[m] += s[m]*f;
+        if(pc && cat && Array.isArray(pc[cat])){
+          const fcm = fcc[cat] ? fcc[cat][m] : 0;
+          if(fcm){ acc[m] += s[m]*(pc[cat][m]/fcm); }           // reparto proporcional al forecast (normal)
+          else {
+            // Mes sin forecast en la categoría: repartir el Ppto por peso ANUAL del nodo
+            // (que sí es ≠0) o, si tampoco hay forecast anual, a partes iguales entre hojas.
+            // Antes se multiplicaba por el forecast del mes (0) y el importe se perdía.
+            if(annNode===null){ annCat = fcc[cat] ? fcc[cat].reduce((a,b)=>a+b,0) : 0;
+              let a=0; for(let k=0;k<12;k++) a += sg*s[k]; annNode=a; }
+            const w = annCat ? (annNode/annCat) : (1/((CAT_HOJAS[cat])||1));
+            acc[m] += sg * pc[cat][m] * w;
+          }
+        } else { acc[m] += s[m]*(1 + incFrac(cat, h.id)); }
+      } else { acc[m] += s[m]; }
     }
   });
+  // Categorías seleccionadas con Ppto publicado pero SIN ningún nodo de forecast en este hotel
+  // (p.ej. un hotel nuevo sin histórico ni forecast de alojamiento): su importe no se pudo
+  // repartir arriba, así que se añade directo al total (como hace el Comparativo).
+  if(esPpto && pc){
+    const catsSel=new Set(), catConNodo=new Set();
+    ids.forEach(id=>{ const c=CAT_POR_NODO[id]; if(!c) return; catsSel.add(c); if(src[id]) catConNodo.add(c); });
+    catsSel.forEach(cat=>{ if(!catConNodo.has(cat) && Array.isArray(pc[cat])){
+      const sg=CAT_SIGN[cat]||1; for(let m=0;m<12;m++) acc[m] += sg*pc[cat][m]; } });
+  }
   return acc;
 }
 // Ajuste del MF de la Central (Ppto), en signo raw: SUSTITUYE su mf_ing propio por el MF

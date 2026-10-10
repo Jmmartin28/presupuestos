@@ -247,9 +247,10 @@ function metricasDeCat(cat){
 }
 function catPpto(h){
   const v=activeVersion(), pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto detallado de la hoja de trabajo
-  let out;
-  if(pc){ out={}; D.catClaves.forEach(k=> out[k]= Array.isArray(pc[k]) ? pc[k].reduce((a,x)=>a+x,0) : 0); }
-  else { const fc=catForecast(h); out={}; D.catClaves.forEach(k=> out[k]=(fc[k]||0)*(1+incFrac(k,h.id))); }
+  // Fallback POR categoría: cada categoría usa su Ppto publicado si existe; si no, forecast ×
+  // incremento. Antes, si existía pc, las categorías sin pc[k] quedaban a 0 (se perdían).
+  const fc=catForecast(h); const out={};
+  D.catClaves.forEach(k=> out[k]= (pc && Array.isArray(pc[k])) ? pc[k].reduce((a,x)=>a+x,0) : (fc[k]||0)*(1+incFrac(k,h.id)));
   if(h.esCentral) out.mf_ing = mfCentralPpto();   // ingreso MF de la Central = Σ MF (coste) de hoteleras
   return out;
 }

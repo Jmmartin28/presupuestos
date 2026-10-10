@@ -441,17 +441,29 @@ async function exportarPowerBI(){
     const fcCat=FN=>{ const out={}; Object.keys(FN).forEach(id=>{ const cat=CAT[id]; if(!cat)return; if(!out[cat])out[cat]=Z();
       const s=FN[id], sg=ING.has(+id)?-1:1; for(let m=0;m<12;m++)out[cat][m]+=sg*s[m]; }); return out; };
     const incluido = id => !v || !Array.isArray(v.hoteles) || v.hoteles.indexOf(id)!==-1;
+    // Nº de hojas y signo por categoría (reparto sin forecast / categorías sin nodo).
+    const CAT_HOJAS={}; Object.keys(CAT).forEach(id=>{ if(!(HIJOS[id]&&HIJOS[id].length)){ const c=CAT[id]; CAT_HOJAS[c]=(CAT_HOJAS[c]||0)+1; }});
+    const CAT_SIGN={}; (PB.catNodos||[]).forEach(c=>{ const hj=sub(c.nodo).filter(n=>!(HIJOS[n]&&HIJOS[n].length)); CAT_SIGN[c.clave]=hj.some(n=>ING.has(+n))?-1:1; });
     const filas=[];
     PB.hoteles.forEach(h=>{ if(!incluido(h.id)) return;
       const FN=fcNodo(h), FCC=fcCat(FN);
       const pc = v && v.pptoCat && v.pptoCat[h.id];
       const mapaCuenta = (PB.cuentaPorNodo && PB.cuentaPorNodo[String(h.plan)]) || {};
+      const catConNodo = new Set();
       Object.keys(FN).forEach(id=>{
-        const cat=CAT[id], s=FN[id], ppto=Z();
-        for(let m=0;m<12;m++){ let f;
-          if(pc && cat && Array.isArray(pc[cat]) && FCC[cat] && FCC[cat][m]) f=pc[cat][m]/FCC[cat][m];
-          else f=1+incFrac(cat,h.id);
-          ppto[m]=s[m]*f; }
+        const cat=CAT[id], s=FN[id], ppto=Z(), sg=ING.has(+id)?-1:1;
+        if(cat) catConNodo.add(cat);
+        let annNode=null, annCat=null;
+        for(let m=0;m<12;m++){
+          if(pc && cat && Array.isArray(pc[cat])){
+            const fcm = FCC[cat] ? FCC[cat][m] : 0;
+            if(fcm){ ppto[m]=s[m]*(pc[cat][m]/fcm); }           // reparto proporcional al forecast
+            else {                                              // mes sin forecast: peso anual o equitativo
+              if(annNode===null){ annCat=FCC[cat]?FCC[cat].reduce((a,b)=>a+b,0):0; let a=0; for(let k=0;k<12;k++)a+=sg*s[k]; annNode=a; }
+              ppto[m]= annCat ? sg*pc[cat][m]*(annNode/annCat) : sg*pc[cat][m]/((CAT_HOJAS[cat])||1);
+            }
+          } else { ppto[m]=s[m]*(1+incFrac(cat,h.id)); }
+        }
         if(!ppto.some(x=>Math.abs(x)>0.5)) return;   // omite nodos sin importe
         const cuenta = mapaCuenta[id] || ["",""];
         const fila = new Array(25).fill("");
@@ -460,6 +472,16 @@ async function exportarPowerBI(){
         for(let m=0;m<12;m++) fila[13+m]=Math.round(ppto[m]*100)/100;
         filas.push(fila);
       });
+      // Categorías con Ppto publicado pero sin ningún nodo de forecast en este hotel:
+      // se añaden en una fila propia (sin cuenta de plan) para no perder el importe.
+      if(pc){ (PB.catNodos||[]).forEach(c=>{ const cat=c.clave;
+        if(!catConNodo.has(cat) && Array.isArray(pc[cat]) && pc[cat].some(x=>Math.abs(x)>0.5)){
+          const sg=CAT_SIGN[cat]||1, fila=new Array(25).fill("");
+          fila[7]=h.nomHotel||""; fila[8]=h.nomSociedad||""; fila[9]=PB.anio;
+          fila[10]=""; fila[12]="("+cat+")";
+          for(let m=0;m<12;m++) fila[13+m]=Math.round(sg*pc[cat][m]*100)/100;
+          filas.push(fila);
+        } }); }
     });
     if(!filas.length){ alert("No hay importes de presupuesto para exportar en esta versión."); return; }
     SHG.exportarDatos("Datos_Ppto"+PB.anio, PB_HEADERS, filas, "Datos_Ppto"+PB.anio);
