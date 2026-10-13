@@ -317,12 +317,13 @@ function celD(v, r, fmt){ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`; if(r!=nul
 function mesCorteVer(){ try{ const a=localStorage.getItem("shg_version_activa");
   const vs=JSON.parse(localStorage.getItem("shg_versiones")||"{}"); const v=a&&vs[a]?vs[a]:null;
   return v && typeof v.mesAuditado==="number" ? v.mesAuditado : null; }catch(e){ return null; } }
-// Forecast económico de la partida Personal de un hotel: real hasta el mes de cierre (de la
-// versión o, si no hay, el automático del hotel) + presupuesto después. Igual que las demás ventanas.
-function costeForecastMesDe(H){ const real=H.costeRealMes||Z(), ppto=H.costePptoMes||Z();
-  const N=mesCorteVer(), corte=(N===null)?(H.mesAud||0):N;
-  return M.map((_,m)=> m<corte ? (real[m]||0) : (ppto[m]||0)); }
+// Serie económica con mes de cierre: real hasta el corte (de la versión o, si no hay, el
+// automático del hotel) + presupuesto después. Igual criterio que las demás ventanas.
+function _blendCorte(real, ppto, mesAud){ const N=mesCorteVer(), corte=(N===null)?(mesAud||0):N;
+  return M.map((_,m)=> m<corte ? ((real||[])[m]||0) : ((ppto||[])[m]||0)); }
+function costeForecastMesDe(H){ return _blendCorte(H.costeRealMes, H.costePptoMes, H.mesAud); }
 function costeForecastMes(){ return costeForecastMesDe(HOT); }
+function unifForecastMes(){ return _blendCorte(HOT.unifRealMes, HOT.unifPptoMes, HOT.mesAud); }
 
 function writeResumen(c, r){
   // avgTot: el total del año es el PROMEDIO de los 12 meses (FTE), no el sumatorio.
@@ -337,10 +338,20 @@ function writeResumen(c, r){
   c.unif.forEach((v,i)=>{ const e=$("unif-"+i); if(e){ if(document.activeElement!==e) e.value=n0(v); e.classList.toggle("manual", !!unifEdit[i]); } });
   $("unif-t").innerHTML=n0(sum(c.unif))+'<span class="delta"></span>';
   set("nemp", c.nemp, r.nemp, true, n1, true);
-  set("total", c.total, r.total, true);
-  set("sueldos", c.sueldos, r.sueldos, true);
-  set("segsoc", c.segsoc, r.segsoc, true);
-  set("uniformes", c.uniformes, r.uniformes, true);
+  // Líneas de COSTE: la diferencia se calcula contra el COSTE REAL del forecast (criterio
+  // económico), no contra la reconstrucción Σ(FTE×sueldo). El reparto del forecast se hace
+  // igual que el del ppto: base = total − uniformes, 70% Sueldos / 30% Seg. Sociales. Con el
+  // selector en "Año anterior", la referencia es el real económico de 2025.
+  const _esFc = RB()!=="prev";
+  const _hayEco = Array.isArray(HOT.costeRealMes) && Array.isArray(HOT.costePptoMes);
+  const totalEco = _esFc ? costeForecastMes() : (HOT.coste25Mes||Z());
+  const unifEco  = _esFc ? unifForecastMes()  : (HOT.unif25Mes||Z());
+  const baseEco  = totalEco.map((v,i)=> v - (unifEco[i]||0));
+  const sueldosEco = baseEco.map(x=> x*0.7), segsocEco = baseEco.map(x=> x*0.3);
+  set("total", c.total, _hayEco?totalEco:r.total, true);
+  set("sueldos", c.sueldos, _hayEco?sueldosEco:r.sueldos, true);
+  set("segsoc", c.segsoc, _hayEco?segsocEco:r.segsoc, true);
+  set("uniformes", c.uniformes, _hayEco?unifEco:r.uniformes, true);
   // Total FTE mensual (Σ FTE de los puestos) frente al total FTE de la referencia.
   set("ftetot", c.nemp, r.nemp, true, n1, true);
   // Total Coste Forecast: coste CONTABLE de la partida Personal del forecast (no la
@@ -495,14 +506,20 @@ function _seriesPersonal(id){
   const refE = esc('fteFc','sueldoFc',P0.pct.absentismo,P0.pct.vacaciones,P0.pct.eventos,false,unifFc);
   const prevE = esc('ftePrev','sueldoPrev',P0.pct.absentismo,P0.pct.vacaciones,P0.pct.eventos,false,unifPrev);
   const H = D.porHotel[id] || {};
-  // Total Coste Forecast = coste CONTABLE de Personal (real hasta cierre + ppto) vs real 2025.
-  const costeFc = (Array.isArray(H.costeRealMes) && Array.isArray(H.costePptoMes)) ? costeForecastMesDe(H) : refE.total;
+  // Baseline económico del forecast (coste CONTABLE de Personal, real hasta cierre + ppto),
+  // con su reparto igual que el ppto: base = total − uniformes, 70% Sueldos / 30% Seg. Sociales.
+  const hayEco = Array.isArray(H.costeRealMes) && Array.isArray(H.costePptoMes);
+  const costeFc = hayEco ? costeForecastMesDe(H) : refE.total;
   const coste25 = (Array.isArray(H.coste25Mes) && H.coste25Mes.length===12) ? H.coste25Mes.slice() : prevE.total;
+  const unifFcEco = (hayEco && Array.isArray(H.unifRealMes)) ? _blendCorte(H.unifRealMes, H.unifPptoMes, H.mesAud) : refE.uniformes;
+  const baseFc  = costeFc.map((v,i)=> v - (unifFcEco[i]||0));
+  const sueldosFc = hayEco ? baseFc.map(x=> x*0.7) : refE.sueldos;
+  const segsocFc  = hayEco ? baseFc.map(x=> x*0.3) : refE.segsoc;
   return { puestos: puestos.map(p=>({ nombre:p.nombre, fte:p.fte.slice(), sueldo:p.sueldo })),
     cur: esc('fte','sueldo',pAbs,pVac,pEve,true,unifCur), ref: refE, prev: prevE,
-    costeFc, coste25 };
+    costeFc, coste25, sueldosFc, segsocFc, unifFc: unifFcEco };
 }
-function _tablaPersonal(cur, ref, prev, puestos, costeFc, coste25){
+function _tablaPersonal(cur, ref, prev, puestos, costeFc, coste25, sueldosFc, segsocFc, unifFc){
   const cel=(v,r,fmt)=>{ fmt=fmt||n0; let h=`<span>${fmt(v)}</span>`;
     if(r!=null){ const dv=v-r, p=Math.abs(r)>0.5?dv/Math.abs(r)*100:0; const cls=dv<0?'up':'down';
       h+=`<span class="delta ${cls}">${dv>=0?'+':''}${fmt(dv)} · ${dv>=0?'+':''}${p.toFixed(1)}%</span>`; } else h+='<span class="delta"></span>'; return h; };
@@ -516,12 +533,12 @@ function _tablaPersonal(cur, ref, prev, puestos, costeFc, coste25){
     + fila('','Absentismo', c.abs, null) + fila('','Vacaciones', c.vac, null) + fila('','Eventos', c.eve, null)
     + fila('','Uniformidad', c.unif, null)
     + fila('','Nº empleados (FTE)', c.nemp, r.nemp, n1, true)
-    + fila('total','TOTAL COSTE', c.total, r.total)
+    + fila('total','TOTAL COSTE', c.total, costeFc||r.total)
     + fila('totalfc','TOTAL COSTE FORECAST', costeFc||r.total, coste25||prev.total)
     + `<tr class="rep"><td class="lbl" colspan="14">Reparto a USALI</td></tr>`
-    + fila('rep','Sueldos y salarios (70%)', c.sueldos, r.sueldos)
-    + fila('rep','Seguros Sociales (30%)', c.segsoc, r.segsoc)
-    + fila('rep','Uniformes', c.uniformes, r.uniformes)
+    + fila('rep','Sueldos y salarios (70%)', c.sueldos, sueldosFc||r.sueldos)
+    + fila('rep','Seguros Sociales (30%)', c.segsoc, segsocFc||r.segsoc)
+    + fila('rep','Uniformes', c.uniformes, unifFc||r.uniformes)
     + fila('totalfte','Total FTE', c.nemp, r.nemp, n1, true);
   // Apartado de puestos (FTE por mes, Total FTE y sueldo €/FTE) igual que en la ventana; solo en hojas de hotel.
   if(puestos && puestos.length){
@@ -542,12 +559,13 @@ $("btnExcel").addEventListener("click", ()=>{
   const hs=D.hoteles.filter(hotelVisible); if(!hs.length) return;
   const lib=SHG.nuevoLibro();
   const cont=document.createElement("div"); cont.style.cssText="position:absolute;left:-9999px;top:0;"; document.body.appendChild(cont);
-  const push=(nombre,S)=>{ cont.innerHTML=""; const t=_tablaPersonal(S.cur,S.ref,S.prev,S.puestos,S.costeFc,S.coste25); cont.appendChild(t); SHG.agregarHoja(lib, nombre, t); };
+  const push=(nombre,S)=>{ cont.innerHTML=""; const t=_tablaPersonal(S.cur,S.ref,S.prev,S.puestos,S.costeFc,S.coste25,S.sueldosFc,S.segsocFc,S.unifFc); cont.appendChild(t); SHG.agregarHoja(lib, nombre, t); };
   const SS=hs.map(h=>_seriesPersonal(h.id)).filter(Boolean);
   const KEYS=['plant','abs','vac','eve','unif','nemp','total','sueldos','segsoc','uniformes'];
   const sc=g=>{ const o={}; KEYS.forEach(k=> o[k]=M.map((_,i)=> SS.reduce((a,s)=> a+((s[g][k]||[])[i]||0),0))); return o; };
-  const scS=key=>M.map((_,i)=> SS.reduce((a,s)=> a+((s[key]||[])[i]||0),0));   // suma de una serie suelta (costeFc/coste25)
-  push("Agregado", { cur:sc('cur'), ref:sc('ref'), prev:sc('prev'), costeFc:scS('costeFc'), coste25:scS('coste25') });
+  const scS=key=>M.map((_,i)=> SS.reduce((a,s)=> a+((s[key]||[])[i]||0),0));   // suma de una serie suelta
+  push("Agregado", { cur:sc('cur'), ref:sc('ref'), prev:sc('prev'), costeFc:scS('costeFc'), coste25:scS('coste25'),
+    sueldosFc:scS('sueldosFc'), segsocFc:scS('segsocFc'), unifFc:scS('unifFc') });
   hs.forEach(h=>{ const s=_seriesPersonal(h.id); if(s) push(h.nombre, s); });
   document.body.removeChild(cont);
   SHG.descargarLibro(lib, "Personal");
