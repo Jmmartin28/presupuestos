@@ -325,6 +325,14 @@ function aplicarCorte(){
   }); });
 }
 aplicarCorte();
+// El método Ratio·ocupación usa la OCUPADA 2027 del presupuesto (publicada por Alojamiento),
+// no el forecast: así un hotel sin ocupación histórica también reparte por ratio. Se recalcula
+// también el ratio de referencia (hint) para que sea coherente (= coste forecast / ocupación 2027).
+(function aplicarOcupaPpto(){
+  const o=ocupaPptoMes(); if(!(o && o.some(x=>x))) return;
+  D.drivers.ocuMes=o; const ocuA=sum(o);
+  D.grupos.forEach(g=> g.detalle.forEach(d=>{ if(d.refFc) d.refFc.ratio = ocuA?Math.round((d.fc||0)/ocuA*1000)/1000:0; }));
+})();
 
 function evalFormula(str, refs) {
   if (!str || !str.trim()) return null;
@@ -367,6 +375,14 @@ function alojPaginaMes(){
   const v=activeVersion(); if(!v) return null;
   const d = v.alojamiento && v.alojamiento[D.idHotel]; if(!d) return null;
   return (Array.isArray(d.ventasMes) && d.ventasMes.length===12) ? d.ventasMes : null;
+}
+// Ocupación (nº noches ocupadas) del presupuesto 2027 publicada por la página de Alojamiento;
+// si no hay, el forecast. La usa el método Ratio·ocupación: así un hotel sin ocupación histórica
+// (forecast 0) también reparte por ratio con su ocupación de 2027.
+function ocupaPptoMes(){
+  const v=activeVersion(); const d = v && v.alojamiento && v.alojamiento[D.idHotel];
+  if(d && Array.isArray(d.ocu) && d.ocu.length===12 && d.ocu.some(x=>x)) return d.ocu.map(x=>+x||0);
+  return D.drivers.ocuMes || Z();
 }
 // Componentes de Personal publicados por su página (Sueldos, Seg. Social, Uniformes).
 function persPaginaMes(){
