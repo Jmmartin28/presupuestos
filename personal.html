@@ -331,7 +331,7 @@ function writeResumen(c, r){
     serie.forEach((v,i)=>{ const e=$(id+"-"+i); if(e) e.innerHTML = (delta&&refserie)?celD(v,refserie[i],fmt):fmt(v)+'<span class="delta"></span>'; });
     const tv = avgTot ? sum(serie)/12 : sum(serie), rv = refserie ? (avgTot ? sum(refserie)/12 : sum(refserie)) : null;
     const t=$(id+"-t"); if(t) t.innerHTML = (delta&&refserie)?celD(tv,rv,fmt):fmt(tv)+'<span class="delta"></span>'; };
-  set("plant", c.plant, r.plant, true);
+  set("plant", c.plant);   // Plantilla permanente: solo el valor (sin diferencia, la reconstrucción del forecast no es comparable)
   // filas % con input manual: escribir en los inputs
   ["abs","vac","eve"].forEach(k=>{ c[k].forEach((v,i)=>{ const e=$(k+"-"+i); if(e && document.activeElement!==e){ e.value=n0(v); e.classList.toggle("manual", manual[k][i]!=null); } });
     const t=$(k+"-t"); if(t) t.innerHTML=n0(sum(c[k]))+'<span class="delta"></span>'; });
@@ -529,7 +529,7 @@ function _tablaPersonal(cur, ref, prev, puestos, costeFc, coste25, sueldosFc, se
       + serie.map((v,i)=>`<td class="num mes">${cel(v, refserie?refserie[i]:null, fmt)}</td>`).join("")
       + `<td class="num tot">${cel(tv, rv, fmt)}</td></tr>`; };
   const c=cur, r=ref;
-  let b = fila('plant','Plantilla permanente', c.plant, r.plant)
+  let b = fila('plant','Plantilla permanente', c.plant, null)
     + fila('','Absentismo', c.abs, null) + fila('','Vacaciones', c.vac, null) + fila('','Eventos', c.eve, null)
     + fila('','Uniformidad', c.unif, null)
     + fila('','Nº empleados (FTE)', c.nemp, r.nemp, n1, true)
