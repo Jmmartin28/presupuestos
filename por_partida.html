@@ -277,12 +277,24 @@ function mfCentralPptoMes(){
     const s=catPptoMesPP(h,"management_fees"); for(let m=0;m<12;m++) acc[m]+= s[m]||0; } });
   return acc;
 }
-// Núcleo: suma RAW (sin flip de signo) de un conjunto de nodos, con el reparto del Ppto.
+// ¿La versión trae el Ppto EXACTO por nodo publicado por la Hoja? (versiones republicadas)
+function _nodosPub(h){ const v=activeVersion(); const pc=v&&v.pptoCat&&v.pptoCat[h.id];
+  return (pc && pc._nodos && typeof pc._nodos==="object") ? pc._nodos : null; }
+// Núcleo: suma RAW (sin flip de signo) de un conjunto de nodos.
 function _serieRaw(h, key, ids){
   const src = (key==="ppto"||key==="fc") ? fcNodo(h) : h[key], esPpto = key==="ppto", acc = Z();
   const v = esPpto ? activeVersion() : null;
   const pc = v && v.pptoCat && v.pptoCat[h.id];   // Ppto por categoría publicado por la hoja
+  const nodosPub = esPpto ? _nodosPub(h) : null;  // Ppto exacto por nodo (si la versión lo trae)
   const fcc = esPpto ? fcCatDe(h) : null;
+  if(nodosPub){
+    // Versión con Ppto por nodo: se usa TAL CUAL (coincide con la Hoja; sin repartos).
+    // Un nodo que la Hoja no presupuesta no está en nodosPub → aporta 0.
+    ids.forEach(id=>{ const pub = nodosPub[id]; if(!Array.isArray(pub)) return;
+      const sg = ING.has(+id) ? -1 : 1; for(let m=0;m<12;m++) acc[m] += sg*(pub[m]||0); });
+    return acc;
+  }
+  // --- Versiones antiguas (sin Ppto por nodo): reparto proporcional al forecast (fallback) ---
   ids.forEach(id=>{ const s = src[id]; if(!s) return; const cat = CAT_POR_NODO[id];
     const sg = ING.has(+id) ? -1 : 1;
     let annNode=null, annCat=null;   // pesos anuales (lazy), para meses sin forecast
@@ -290,11 +302,8 @@ function _serieRaw(h, key, ids){
       if(esPpto){
         if(pc && cat && Array.isArray(pc[cat])){
           const fcm = fcc[cat] ? fcc[cat][m] : 0;
-          if(fcm){ acc[m] += s[m]*(pc[cat][m]/fcm); }           // reparto proporcional al forecast (normal)
+          if(fcm){ acc[m] += s[m]*(pc[cat][m]/fcm); }           // reparto proporcional al forecast
           else {
-            // Mes sin forecast en la categoría: repartir el Ppto por peso ANUAL del nodo
-            // (que sí es ≠0) o, si tampoco hay forecast anual, a partes iguales entre hojas.
-            // Antes se multiplicaba por el forecast del mes (0) y el importe se perdía.
             if(annNode===null){ annCat = fcc[cat] ? fcc[cat].reduce((a,b)=>a+b,0) : 0;
               let a=0; for(let k=0;k<12;k++) a += sg*s[k]; annNode=a; }
             const w = annCat ? (annNode/annCat) : (1/((CAT_HOJAS[cat])||1));
@@ -304,9 +313,6 @@ function _serieRaw(h, key, ids){
       } else { acc[m] += s[m]; }
     }
   });
-  // Categorías seleccionadas con Ppto publicado pero SIN ningún nodo de forecast en este hotel
-  // (p.ej. un hotel nuevo sin histórico ni forecast de alojamiento): su importe no se pudo
-  // repartir arriba, así que se añade directo al total (como hace el Comparativo).
   if(esPpto && pc){
     const catsSel=new Set(), catConNodo=new Set();
     ids.forEach(id=>{ const c=CAT_POR_NODO[id]; if(!c) return; catsSel.add(c); if(src[id]) catConNodo.add(c); });
@@ -326,7 +332,8 @@ function ajusteMfCentralRaw(h, key){
 // Ingresos en positivo (con el ingreso MF intragrupo de la Central en el Ppto).
 function ingresosPos(h, key){
   const acc = _serieRaw(h, key, subarbol(D.pyl.ingresos));
-  if(key==="ppto" && h.esCentral){ const aj=ajusteMfCentralRaw(h, key); for(let m=0;m<12;m++) acc[m] += aj[m]; }
+  // Con Ppto por nodo publicado, el MF intragrupo de la Central ya viene en los nodos; no se reajusta.
+  if(key==="ppto" && h.esCentral && !_nodosPub(h)){ const aj=ajusteMfCentralRaw(h, key); for(let m=0;m<12;m++) acc[m] += aj[m]; }
   return acc.map(x=> -x);
 }
 // Márgenes del P&L (GOP/EBITDA/RN): los nodos-margen no tienen datos propios, se calculan.
@@ -346,7 +353,8 @@ function serie(h, key){                    // 12 meses de la partida (nodo o mar
   if(tipoMargen) return serieMargen(h, key, tipoMargen);
   const ids = subarbol(nodo), esPpto = key==="ppto", acc = _serieRaw(h, key, ids);
   // Central: en el Ppto, el ingreso de Management Fees = Σ MF (coste) de hoteleras (sustituye el propio).
-  if(esPpto && h.esCentral && NODO_MF_ING!=null && ids.indexOf(NODO_MF_ING)>=0){
+  // Con Ppto por nodo publicado ya viene correcto en los nodos → no se reajusta.
+  if(esPpto && h.esCentral && !_nodosPub(h) && NODO_MF_ING!=null && ids.indexOf(NODO_MF_ING)>=0){
     const aj=ajusteMfCentralRaw(h, key); for(let m=0;m<12;m++) acc[m] += aj[m];   // signo raw (antes del flip)
   }
   if(ING.has(nodo)) for(let m=0;m<12;m++) acc[m] = -acc[m];   // ingresos en positivo

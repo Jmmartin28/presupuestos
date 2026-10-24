@@ -478,6 +478,9 @@ function publicarPpto(){
     // Se guarda sin redondear por mes: los informes suman estos 12 meses y redondean
     // al final igual que la hoja, para que los importes cuadren al euro.
     const pc = {}; D.grupos.forEach(g=> pc[g.catClave] = (g._m||Z()).slice());
+    // Ppto EXACTO por nodo USALI: Por Partidas y el export a Power BI muestran este importe
+    // tal cual (sin repartos ni recálculos), así coincide con la Hoja partida a partida.
+    pc._nodos = {}; D.grupos.forEach(g=> g.detalle.forEach(d=>{ if(d.nodo!=null) pc._nodos[d.nodo] = (d._m||Z()).slice(); }));
     vs[act].pptoCat = vs[act].pptoCat || {};
     vs[act].pptoCat[D.idHotel] = pc;
     vs[act].modificada = new Date().toISOString();

@@ -448,7 +448,22 @@ async function exportarPowerBI(){
     PB.hoteles.forEach(h=>{ if(!incluido(h.id)) return;
       const FN=fcNodo(h), FCC=fcCat(FN);
       const pc = v && v.pptoCat && v.pptoCat[h.id];
+      const nodosPub = (pc && pc._nodos && typeof pc._nodos==="object") ? pc._nodos : null;
       const mapaCuenta = (PB.cuentaPorNodo && PB.cuentaPorNodo[String(h.plan)]) || {};
+      if(nodosPub){
+        // Versión con Ppto por nodo: una fila por nodo con su importe EXACTO (como la Hoja).
+        Object.keys(nodosPub).forEach(id=>{ const serie=nodosPub[id]; if(!Array.isArray(serie)) return;
+          const sg=ING.has(+id)?-1:1, ppto=serie.map(x=> sg*(+x||0));
+          if(!ppto.some(x=>Math.abs(x)>0.5)) return;
+          const cuenta = mapaCuenta[id] || ["",""];
+          const fila=new Array(25).fill(""); fila[7]=h.nomHotel||""; fila[8]=h.nomSociedad||""; fila[9]=PB.anio;
+          fila[10]=cuenta[0]; fila[12]=cuenta[1];
+          for(let m=0;m<12;m++) fila[13+m]=Math.round(ppto[m]*100)/100;
+          filas.push(fila);
+        });
+        return;   // sin repartos para esta versión
+      }
+      // --- Versiones antiguas (sin Ppto por nodo): reparto proporcional (fallback) ---
       const catConNodo = new Set();
       Object.keys(FN).forEach(id=>{
         const cat=CAT[id], s=FN[id], ppto=Z(), sg=ING.has(+id)?-1:1;
